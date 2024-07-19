@@ -54,9 +54,12 @@ app.post('/api/anthropic', async (req, res) => {
     // Remove any remaining ``` markers and trim the conversation text
     conversationText = conversationText.replace(/```/g, '').trim();
 
+    console.log(msg.usage)
+
     res.json({
       conversation: conversationText,
-      codeScripts: scripts
+      codeScripts: scripts,
+      usage: msg.usage
     });
   } catch (error) {
     console.error('Anthropic API Error:', error.response ? error.response.data : error.message);

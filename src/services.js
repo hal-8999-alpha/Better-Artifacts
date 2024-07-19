@@ -18,7 +18,7 @@ export const makeApiCall = async (model, userInput) => {
       };
     } else if (model === 'Claude') {
       const response = await axios.post(`${API_URL}/anthropic`, {
-        system: "Respond with an explanation and python code. For each new Python function, start with SCRIPT_X on a new line (where X is the script number), followed by the function in a Python code block.",
+        system: "Respond with an explanation and python code. For each new Python function, start with SCRIPT_X on a new line (where X is the script number), followed by the function in a Python code block. Only resond with what the user explicitly asks for",
         messages: [
           {
             role: "user",
@@ -34,6 +34,7 @@ export const makeApiCall = async (model, userInput) => {
       return {
         conversation: response.data.conversation,
         codeScripts: response.data.codeScripts,
+        usage: response.data.usage,
         role: 'assistant'
       };
     }

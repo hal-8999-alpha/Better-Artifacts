@@ -8,6 +8,18 @@
           </p>
         </div>
       </div>
+      <div class="info-row">
+        <div class="info-column">Total Tokens: {{ $store.getters.getTotalTokens }}</div>
+        <div class="info-column">Estimated Cost: {{ $store.getters.getFormattedCost }}</div>
+        <div class="info-column">
+          <button @click="copyConversation" class="copy-button">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+            </svg>
+          </button>
+        </div>
+      </div>
       <div class="user-input">
         <input 
           type="text" 
@@ -33,15 +45,16 @@
         </select>
       </div>
       <div class="formatted-code">
-        <pre v-if="codeScripts.length > 0"><code>{{ codeScripts[activeTab] }}</code></pre>
-        <button v-if="codeScripts.length > 0" @click="copyContent" class="copy-button">
-          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <p v-if="codeScripts.length === 0" class="default-text">Generated Code Will Go Here</p>
+        <pre v-else><code>{{ codeScripts[activeTab] }}</code></pre>
+        <button v-if="codeScripts.length > 0" @click="copyCode" class="copy-button code-copy-button">
+          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
             <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
           </svg>
         </button>
       </div>
-      <div class="tabs">
+      <div class="tabs" v-if="codeScripts.length > 0">
         <div 
           v-for="(tab, index) in codeScripts" 
           :key="index" 
@@ -58,7 +71,10 @@
 
 <script setup>
 import { ref, onMounted } from 'vue';
+import { useStore } from 'vuex';
 import { makeApiCall } from '../services';
+
+const store = useStore();
 
 const userInput = ref(null);
 const userInputText = ref('');
@@ -100,24 +116,43 @@ const handleSend = async () => {
       codeScripts.value = [];
     }
   } else if (selectedModel.value === 'Claude') {
-    // Handle Claude response
     conversation.value.push({ role: 'assistant', content: response.conversation });
     codeScripts.value = response.codeScripts;
+
+    console.log('Updating tokens and cost:', response.usage);
+    store.dispatch('updateTokensAndCost', {
+      inputTokens: response.usage.input_tokens,
+      outputTokens: response.usage.output_tokens
+    });
   }
 
-  userInputText.value = ''; // Clear the input after sending
-  activeTab.value = 0; // Reset to the first tab
+  userInputText.value = '';
+  activeTab.value = 0;
 };
 
-const copyContent = () => {
-  navigator.clipboard.writeText(codeScripts.value[activeTab.value])
+const copyConversation = () => {
+  const conversationText = conversation.value
+    .map(message => `${message.role}: ${message.content}`)
+    .join('\n\n');
+  navigator.clipboard.writeText(conversationText)
     .then(() => {
-      console.log('Content copied to clipboard');
-      // You could add a temporary visual feedback here
+      console.log('Conversation copied to clipboard');
     })
     .catch(err => {
-      console.error('Failed to copy: ', err);
+      console.error('Failed to copy conversation: ', err);
     });
+};
+
+const copyCode = () => {
+  if (codeScripts.value.length > 0) {
+    navigator.clipboard.writeText(codeScripts.value[activeTab.value])
+      .then(() => {
+        console.log('Code copied to clipboard');
+      })
+      .catch(err => {
+        console.error('Failed to copy code: ', err);
+      });
+  }
 };
 </script>
 
@@ -166,6 +201,20 @@ const copyContent = () => {
   margin-bottom: 0.5rem;
 }
 
+.info-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.info-column {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
 .user-input {
   display: flex;
   gap: 0.5rem;
@@ -190,7 +239,7 @@ input:focus {
   padding: 0.75rem;
   border: none;
   border-radius: 4px;
-  background-color: #333333;
+  background-color: transparent;
   color: #cccccc;
   cursor: pointer;
   transition: all 0.3s ease;
@@ -203,14 +252,14 @@ input:focus {
   background-color: #444444;
 }
 
-.copy-button {
+.copy-button svg, .send-button svg {
+  stroke: currentColor;
+}
+
+.code-copy-button {
   position: absolute;
   bottom: 0.5rem;
   right: 0.5rem;
-}
-
-.copy-button svg, .send-button svg {
-  stroke: currentColor;
 }
 
 .tabs {
@@ -263,8 +312,9 @@ select:focus {
   box-shadow: 0 0 0 2px #3498db;
 }
 
-.no-code-message {
-  color: #888;
-  font-style: italic;
+.default-text {
+  color: #666;
+  text-align: center;
+  margin-top: 2rem;
 }
 </style>
