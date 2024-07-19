@@ -1,58 +1,270 @@
 <template>
-  <div class="hello">
-    <h1>{{ msg }}</h1>
-    <p>
-      For a guide and recipes on how to configure / customize this project,<br>
-      check out the
-      <a href="https://cli.vuejs.org" target="_blank" rel="noopener">vue-cli documentation</a>.
-    </p>
-    <h3>Installed CLI Plugins</h3>
-    <ul>
-      <li><a href="https://github.com/vuejs/vue-cli/tree/dev/packages/%40vue/cli-plugin-router" target="_blank" rel="noopener">router</a></li>
-      <li><a href="https://github.com/vuejs/vue-cli/tree/dev/packages/%40vue/cli-plugin-vuex" target="_blank" rel="noopener">vuex</a></li>
-    </ul>
-    <h3>Essential Links</h3>
-    <ul>
-      <li><a href="https://vuejs.org" target="_blank" rel="noopener">Core Docs</a></li>
-      <li><a href="https://forum.vuejs.org" target="_blank" rel="noopener">Forum</a></li>
-      <li><a href="https://chat.vuejs.org" target="_blank" rel="noopener">Community Chat</a></li>
-      <li><a href="https://twitter.com/vuejs" target="_blank" rel="noopener">Twitter</a></li>
-      <li><a href="https://news.vuejs.org" target="_blank" rel="noopener">News</a></li>
-    </ul>
-    <h3>Ecosystem</h3>
-    <ul>
-      <li><a href="https://router.vuejs.org" target="_blank" rel="noopener">vue-router</a></li>
-      <li><a href="https://vuex.vuejs.org" target="_blank" rel="noopener">vuex</a></li>
-      <li><a href="https://github.com/vuejs/vue-devtools#vue-devtools" target="_blank" rel="noopener">vue-devtools</a></li>
-      <li><a href="https://vue-loader.vuejs.org" target="_blank" rel="noopener">vue-loader</a></li>
-      <li><a href="https://github.com/vuejs/awesome-vue" target="_blank" rel="noopener">awesome-vue</a></li>
-    </ul>
+  <div class="container">
+    <div class="left-column">
+      <div class="content">
+        <div v-for="(message, index) in conversation" :key="index">
+          <p :class="{ 'user-message': message.role === 'user', 'ai-message': message.role === 'assistant' }">
+            {{ message.content }}
+          </p>
+        </div>
+      </div>
+      <div class="user-input">
+        <input 
+          type="text" 
+          ref="userInput" 
+          v-model="userInputText" 
+          placeholder="Enter text here..." 
+          @keyup.enter="handleSend"
+        >
+        <button @click="handleSend" class="send-button">
+          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="5" y1="12" x2="19" y2="12"></line>
+            <polyline points="12 5 19 12 12 19"></polyline>
+          </svg>
+        </button>
+      </div>
+    </div>
+    <div class="right-column">
+      <div class="dropdown">
+        <select v-model="selectedModel" @change="handleModelChange">
+          <option v-for="model in models" :key="model" :value="model">
+            {{ model }}
+          </option>
+        </select>
+      </div>
+      <div class="formatted-code">
+        <pre v-if="codeScripts.length > 0"><code>{{ codeScripts[activeTab] }}</code></pre>
+        <button v-if="codeScripts.length > 0" @click="copyContent" class="copy-button">
+          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+          </svg>
+        </button>
+      </div>
+      <div class="tabs">
+        <div 
+          v-for="(tab, index) in codeScripts" 
+          :key="index" 
+          class="tab" 
+          :class="{ 'active': activeTab === index }"
+          @click="activeTab = index"
+        >
+          {{ index + 1 }}
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
-<script>
-export default {
-  name: 'HelloWorld',
-  props: {
-    msg: String
+<script setup>
+import { ref, onMounted } from 'vue';
+import { makeApiCall } from '../services';
+
+const userInput = ref(null);
+const userInputText = ref('');
+const conversation = ref([]);
+const codeScripts = ref([]);
+const activeTab = ref(0);
+const models = ['Claude', 'GPT4o'];
+const selectedModel = ref('Claude');
+
+onMounted(() => {
+  userInput.value.focus();
+});
+
+const handleModelChange = () => {
+  console.log(`Model changed to: ${selectedModel.value}`);
+};
+
+const handleSend = async () => {
+  if (!userInputText.value.trim()) return;
+
+  conversation.value.push({ role: 'user', content: userInputText.value });
+  const response = await makeApiCall(selectedModel.value, userInputText.value);
+  
+  if (selectedModel.value === 'GPT4o') {
+    // Parse OpenAI response (unchanged)
+    const codeBlockRegex = /```[\s\S]*?```/g;
+    const codeBlocks = response.content.match(codeBlockRegex) || [];
+    let conversationText = response.content;
+
+    codeBlocks.forEach((block, index) => {
+      conversationText = conversationText.replace(block, `[Code Block ${index + 1}]`);
+    });
+
+    conversation.value.push({ role: 'assistant', content: conversationText });
+    
+    if (codeBlocks.length > 0) {
+      codeScripts.value = codeBlocks.map(block => block.replace(/```/g, '').trim());
+    } else {
+      codeScripts.value = [];
+    }
+  } else if (selectedModel.value === 'Claude') {
+    // Handle Claude response
+    conversation.value.push({ role: 'assistant', content: response.conversation });
+    codeScripts.value = response.codeScripts;
   }
-}
+
+  userInputText.value = ''; // Clear the input after sending
+  activeTab.value = 0; // Reset to the first tab
+};
+
+const copyContent = () => {
+  navigator.clipboard.writeText(codeScripts.value[activeTab.value])
+    .then(() => {
+      console.log('Content copied to clipboard');
+      // You could add a temporary visual feedback here
+    })
+    .catch(err => {
+      console.error('Failed to copy: ', err);
+    });
+};
 </script>
 
-<!-- Add "scoped" attribute to limit CSS to this component only -->
 <style scoped>
-h3 {
-  margin: 40px 0 0;
+.container {
+  display: flex;
+  height: 100vh;
+  font-family: 'Arial', sans-serif;
+  background-color: #000000;
+  color: #cccccc;
 }
-ul {
-  list-style-type: none;
-  padding: 0;
+
+.left-column, .right-column {
+  display: flex;
+  flex-direction: column;
+  width: 50%;
+  padding: 1rem;
+  position: relative;
 }
-li {
-  display: inline-block;
-  margin: 0 10px;
+
+.content, .formatted-code {
+  flex-grow: 1;
+  overflow-y: auto;
+  padding: 1rem;
+  border-radius: 8px;
+  background-color: #000000;
+  box-shadow: 0 4px 6px rgba(255, 255, 255, 0.1);
+  position: relative;
+  margin-bottom: 1rem;
 }
-a {
-  color: #42b983;
+
+.content p, .formatted-code pre {
+  text-align: left;
+  margin: 0;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
+
+.user-message {
+  color: #4a9eff;
+  margin-bottom: 0.5rem;
+}
+
+.ai-message {
+  color: #cccccc;
+  margin-bottom: 0.5rem;
+}
+
+.user-input {
+  display: flex;
+  gap: 0.5rem;
+}
+
+input {
+  flex-grow: 1;
+  padding: 0.75rem;
+  border: none;
+  border-radius: 4px;
+  background-color: #333333;
+  color: #cccccc;
+  font-size: 1rem;
+}
+
+input:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px #3498db;
+}
+
+.send-button, .copy-button {
+  padding: 0.75rem;
+  border: none;
+  border-radius: 4px;
+  background-color: #333333;
+  color: #cccccc;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.send-button:hover, .copy-button:hover {
+  background-color: #444444;
+}
+
+.copy-button {
+  position: absolute;
+  bottom: 0.5rem;
+  right: 0.5rem;
+}
+
+.copy-button svg, .send-button svg {
+  stroke: currentColor;
+}
+
+.tabs {
+  display: flex;
+  gap: 0.5rem;
+  height: 50px;
+  background-color: #000000;
+  border-radius: 25px;
+  padding: 5px;
+  overflow-x: auto;
+}
+
+.tab {
+  flex: 0 0 auto;
+  min-width: 50px;
+  max-width: 120px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background-color: #333333;
+  border-radius: 20px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  font-size: 0.9rem;
+  padding: 0 15px;
+}
+
+.tab:hover, .tab.active {
+  background-color: #444444;
+}
+
+.dropdown {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  z-index: 1000;
+}
+
+select {
+  padding: 0.5rem;
+  border-radius: 20px;
+  background-color: #333333;
+  color: #cccccc;
+  border: none;
+  cursor: pointer;
+}
+
+select:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px #3498db;
+}
+
+.no-code-message {
+  color: #888;
+  font-style: italic;
 }
 </style>
