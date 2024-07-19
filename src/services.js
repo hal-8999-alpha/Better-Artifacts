@@ -46,3 +46,30 @@ export const makeApiCall = async (model, userInput) => {
     };
   }
 };
+
+// New function to call the start-process endpoint
+export const startProcess = async () => {
+  try {
+    const response = await axios.get(`${API_URL}/start-process`);
+    
+    if (response.status === 200) {
+      console.log('Process started successfully');
+      return {
+        status: 'success',
+        message: 'Process started successfully'
+      };
+    } else {
+      console.error('Unexpected response status:', response.status);
+      return {
+        status: 'error',
+        message: 'Unexpected response from server'
+      };
+    }
+  } catch (error) {
+    console.error('Error starting process:', error);
+    return {
+      status: 'error',
+      message: error.response?.data?.error || 'An error occurred while starting the process'
+    };
+  }
+};

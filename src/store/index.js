@@ -4,7 +4,8 @@ export default createStore({
   state: {
     totalInputTokens: 0,
     totalOutputTokens: 0,
-    totalCost: 0
+    totalCost: 0,
+    selectedFiles: []
   },
   getters: {
     getTotalTokens: (state) => {
@@ -14,6 +15,9 @@ export default createStore({
     getFormattedCost: (state) => {
       console.log('getFormattedCost called', state.totalCost);
       return `$${state.totalCost.toFixed(4)}`;
+    },
+    getSelectedFiles: (state) => {
+      return state.selectedFiles;
     }
   },
   mutations: {
@@ -25,6 +29,9 @@ export default createStore({
     UPDATE_COST(state, cost) {
       console.log('UPDATE_COST mutation called', cost);
       state.totalCost = cost;
+    },
+    SET_SELECTED_FILES(state, files) {
+      state.selectedFiles = files;
     }
   },
   actions: {
@@ -37,6 +44,9 @@ export default createStore({
       const totalCost = inputCost + outputCost;
       
       commit('UPDATE_COST', totalCost);
+    },
+    setSelectedFiles({ commit }, files) {
+      commit('SET_SELECTED_FILES', files);
     }
   },
   modules: {

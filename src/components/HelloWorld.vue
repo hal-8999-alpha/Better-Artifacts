@@ -2,18 +2,21 @@
   <div class="container">
     <div class="left-column">
       <div class="top-controls">
-        <div v-if="selectedMode === 'Project'" class="update-container">
-          <span v-if="lastUpdateTime" class="last-update-time">
-            Last updated: {{ lastUpdateTime }}
-          </span>
-          <button 
-            @click="handleUpdate" 
-            :disabled="!updateEnabled"
-            class="update-button"
-          >
-            Update
-          </button>
-        </div>
+        <transition name="fade">
+          <div v-if="selectedMode === 'Project'" class="update-container">
+            <span v-if="lastUpdateTime && !isUpdating" class="last-update-time">
+              Last updated: {{ lastUpdateTime }}
+            </span>
+            <div v-if="isUpdating" class="spinner"></div>
+            <button 
+              @click="handleUpdate" 
+              :disabled="!updateEnabled || isUpdating"
+              class="update-button"
+            >
+              {{ isUpdating ? 'Updating...' : 'Update' }}
+            </button>
+          </div>
+        </transition>
       </div>
       <div class="content">
         <div v-for="(message, index) in conversation" :key="index" :class="{ 'message-space': index > 0 }">
@@ -52,6 +55,20 @@
     </div>
     <div class="right-column">
       <div class="dropdowns">
+        <transition name="fade">
+          <button v-if="selectedMode === 'Project'" @click="openFileExplorer" class="file-button">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+            </svg>
+          </button>
+        </transition>
+        <input 
+          type="file" 
+          ref="fileInput" 
+          @change="handleFileSelection" 
+          multiple 
+          style="display: none;"
+        >
         <select v-model="selectedMode" @change="handleModeChange">
           <option v-for="mode in modes" :key="mode" :value="mode">
             {{ mode }}
@@ -91,7 +108,7 @@
 <script setup>
 import { ref, onMounted } from 'vue';
 import { useStore } from 'vuex';
-import { makeApiCall } from '../services';
+import { makeApiCall, startProcess } from '../services';
 
 const store = useStore();
 
@@ -103,9 +120,11 @@ const activeTab = ref(0);
 const models = ['Claude', 'GPT4o'];
 const selectedModel = ref('Claude');
 const modes = ['Code', 'Chat', 'Project'];
-const selectedMode = ref('Chat');
-const updateEnabled = ref(false);
+const selectedMode = ref('Code');
+const updateEnabled = ref(false); // Disabled by default
 const lastUpdateTime = ref('');
+const isUpdating = ref(false);
+const fileInput = ref(null);
 
 onMounted(() => {
   userInput.value.focus();
@@ -119,10 +138,26 @@ const handleModeChange = () => {
   console.log(`Mode changed to: ${selectedMode.value}`);
 };
 
-const handleUpdate = () => {
+const handleUpdate = async () => {
   console.log('Update button clicked');
-  updateEnabled.value = false;
-  lastUpdateTime.value = formatDate(new Date());
+  isUpdating.value = true;
+  updateEnabled.value = false; // Disable the button when clicked
+  
+  try {
+    const result = await startProcess();
+    if (result.status === 'success') {
+      console.log(result.message);
+      lastUpdateTime.value = formatDate(new Date());
+    } else {
+      console.error(result.message);
+      // You might want to handle the error case here, e.g., show an error message to the user
+    }
+  } catch (error) {
+    console.error('Error during update:', error);
+    // Handle any unexpected errors here
+  } finally {
+    isUpdating.value = false;
+  }
 };
 
 const formatDate = (date) => {
@@ -174,7 +209,7 @@ const handleSend = async () => {
   userInputText.value = '';
   activeTab.value = 0;
   adjustTextareaHeight();
-  updateEnabled.value = true;
+  updateEnabled.value = true; // Enable the update button after receiving a response
 };
 
 const copyConversation = () => {
@@ -206,6 +241,20 @@ const adjustTextareaHeight = () => {
   const textarea = userInput.value;
   textarea.style.height = 'auto';
   textarea.style.height = textarea.scrollHeight + 'px';
+};
+
+const openFileExplorer = () => {
+  fileInput.value.click();
+};
+
+const handleFileSelection = (event) => {
+  const files = event.target.files;
+  if (files.length > 0) {
+    // Note: Due to browser security restrictions, we can only access file names, not full paths
+    const fileNames = Array.from(files).map(file => file.name);
+    store.dispatch('setSelectedFiles', fileNames);
+    console.log('Selected files:', fileNames);
+  }
 };
 </script>
 
@@ -401,11 +450,81 @@ select:focus, .update-button:focus {
 
 .update-button:disabled {
   cursor: not-allowed;
+  opacity: 0.7;
 }
 
 .default-text {
   color: #666;
   text-align: center;
   margin-top: 2rem;
+}
+
+.file-button {
+  background-color: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 0.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.file-button:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+.file-button svg {
+  width: 24px;
+  height: 24px;
+}
+
+.spinner {
+  width: 20px;
+  height: 20px;
+  border: 2px solid #cccccc;
+  border-top: 2px solid #8e44ad;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* Fade transition styles */
+.fade-enter-active, .fade-leave-active {
+  transition: opacity 0.5s ease;
+}
+
+.fade-enter-from, .fade-leave-to {
+  opacity: 0;
+}
+
+.content, .formatted-code {
+  flex-grow: 1;
+  overflow-y: auto;
+  padding: 1rem;
+  border-radius: 8px;
+  background-color: #000000;
+  box-shadow: 0 4px 6px rgba(255, 255, 255, 0.1);
+  position: relative;
+  margin-bottom: 1rem;
+  scrollbar-width: thin;
+  scrollbar-color: #444444 #222222;
+}
+
+.content::-webkit-scrollbar, .formatted-code::-webkit-scrollbar {
+  width: 8px;
+}
+
+.content::-webkit-scrollbar-track, .formatted-code::-webkit-scrollbar-track {
+  background: #222222;
+}
+
+.content::-webkit-scrollbar-thumb, .formatted-code::-webkit-scrollbar-thumb {
+  background-color: #444444;
+  border-radius: 4px;
+  border: 2px solid #222222;
 }
 </style>

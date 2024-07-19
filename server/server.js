@@ -3,6 +3,7 @@ const express = require('express');
 const axios = require('axios');
 const cors = require('cors');
 const Anthropic = require('@anthropic-ai/sdk');
+const assistantHandler = require('./customGPT');
 
 const app = express();
 app.use(cors());
@@ -66,6 +67,27 @@ app.post('/api/anthropic', async (req, res) => {
     res.status(500).json({ error: error.response ? error.response.data : error.message });
   }
 });
+
+app.get('/api/start-process', (req, res) => {
+    console.log('Starting process...');
+    
+    // Simulating a process with a timeout
+    setTimeout(() => {
+      try {
+        // Call the starting function from customGPT.js
+        // For now, we'll just log a message
+        console.log('Process completed');
+        
+        // In the future, you would call a function from customGPT here, like:
+        // customGPT.startProcess();
+  
+        res.status(200).send('Process completed successfully');
+      } catch (error) {
+        console.error('Process Error:', error.message);
+        res.status(500).json({ error: error.message });
+      }
+    }, 5000); // 5 second timeout
+  });
 
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
