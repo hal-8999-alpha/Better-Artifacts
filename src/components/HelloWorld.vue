@@ -1,8 +1,22 @@
 <template>
   <div class="container">
     <div class="left-column">
+      <div class="top-controls">
+        <div v-if="selectedMode === 'Project'" class="update-container">
+          <span v-if="lastUpdateTime" class="last-update-time">
+            Last updated: {{ lastUpdateTime }}
+          </span>
+          <button 
+            @click="handleUpdate" 
+            :disabled="!updateEnabled"
+            class="update-button"
+          >
+            Update
+          </button>
+        </div>
+      </div>
       <div class="content">
-        <div v-for="(message, index) in conversation" :key="index">
+        <div v-for="(message, index) in conversation" :key="index" :class="{ 'message-space': index > 0 }">
           <p :class="{ 'user-message': message.role === 'user', 'ai-message': message.role === 'assistant' }">
             {{ message.content }}
           </p>
@@ -21,13 +35,13 @@
         </div>
       </div>
       <div class="user-input">
-        <input 
-          type="text" 
+        <textarea 
           ref="userInput" 
           v-model="userInputText" 
           placeholder="Enter text here..." 
-          @keyup.enter="handleSend"
-        >
+          @keyup.enter.exact.prevent="handleSend"
+          @input="adjustTextareaHeight"
+        ></textarea>
         <button @click="handleSend" class="send-button">
           <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <line x1="5" y1="12" x2="19" y2="12"></line>
@@ -37,7 +51,12 @@
       </div>
     </div>
     <div class="right-column">
-      <div class="dropdown">
+      <div class="dropdowns">
+        <select v-model="selectedMode" @change="handleModeChange">
+          <option v-for="mode in modes" :key="mode" :value="mode">
+            {{ mode }}
+          </option>
+        </select>
         <select v-model="selectedModel" @change="handleModelChange">
           <option v-for="model in models" :key="model" :value="model">
             {{ model }}
@@ -83,6 +102,10 @@ const codeScripts = ref([]);
 const activeTab = ref(0);
 const models = ['Claude', 'GPT4o'];
 const selectedModel = ref('Claude');
+const modes = ['Code', 'Chat', 'Project'];
+const selectedMode = ref('Chat');
+const updateEnabled = ref(false);
+const lastUpdateTime = ref('');
 
 onMounted(() => {
   userInput.value.focus();
@@ -92,6 +115,29 @@ const handleModelChange = () => {
   console.log(`Model changed to: ${selectedModel.value}`);
 };
 
+const handleModeChange = () => {
+  console.log(`Mode changed to: ${selectedMode.value}`);
+};
+
+const handleUpdate = () => {
+  console.log('Update button clicked');
+  updateEnabled.value = false;
+  lastUpdateTime.value = formatDate(new Date());
+};
+
+const formatDate = (date) => {
+  const options = {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    timeZone: 'America/New_York',
+    timeZoneName: 'short'
+  };
+  return date.toLocaleString('en-US', options);
+};
+
 const handleSend = async () => {
   if (!userInputText.value.trim()) return;
 
@@ -99,7 +145,6 @@ const handleSend = async () => {
   const response = await makeApiCall(selectedModel.value, userInputText.value);
   
   if (selectedModel.value === 'GPT4o') {
-    // Parse OpenAI response (unchanged)
     const codeBlockRegex = /```[\s\S]*?```/g;
     const codeBlocks = response.content.match(codeBlockRegex) || [];
     let conversationText = response.content;
@@ -128,6 +173,8 @@ const handleSend = async () => {
 
   userInputText.value = '';
   activeTab.value = 0;
+  adjustTextareaHeight();
+  updateEnabled.value = true;
 };
 
 const copyConversation = () => {
@@ -154,6 +201,12 @@ const copyCode = () => {
       });
   }
 };
+
+const adjustTextareaHeight = () => {
+  const textarea = userInput.value;
+  textarea.style.height = 'auto';
+  textarea.style.height = textarea.scrollHeight + 'px';
+};
 </script>
 
 <style scoped>
@@ -171,6 +224,32 @@ const copyCode = () => {
   width: 50%;
   padding: 1rem;
   position: relative;
+}
+
+.top-controls {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 1rem;
+}
+
+.update-container {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.last-update-time {
+  font-size: 0.9rem;
+  color: #cccccc;
+}
+
+.dropdowns {
+  display: flex;
+  gap: 0.5rem;
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  z-index: 1000;
 }
 
 .content, .formatted-code {
@@ -201,6 +280,10 @@ const copyCode = () => {
   margin-bottom: 0.5rem;
 }
 
+.message-space {
+  margin-top: 1rem;
+}
+
 .info-row {
   display: flex;
   justify-content: space-between;
@@ -220,7 +303,7 @@ const copyCode = () => {
   gap: 0.5rem;
 }
 
-input {
+textarea {
   flex-grow: 1;
   padding: 0.75rem;
   border: none;
@@ -228,9 +311,13 @@ input {
   background-color: #333333;
   color: #cccccc;
   font-size: 1rem;
+  resize: none;
+  overflow-y: hidden;
+  min-height: 2.5rem;
+  max-height: 200px;
 }
 
-input:focus {
+textarea:focus {
   outline: none;
   box-shadow: 0 0 0 2px #3498db;
 }
@@ -291,25 +378,29 @@ input:focus {
   background-color: #444444;
 }
 
-.dropdown {
-  position: absolute;
-  top: 1rem;
-  right: 1rem;
-  z-index: 1000;
-}
-
-select {
+select, .update-button {
   padding: 0.5rem;
   border-radius: 20px;
   background-color: #333333;
   color: #cccccc;
   border: none;
   cursor: pointer;
+  font-size: 1rem;
+  min-width: 100px;
 }
 
-select:focus {
+select:focus, .update-button:focus {
   outline: none;
   box-shadow: 0 0 0 2px #3498db;
+}
+
+.update-button:not(:disabled) {
+  background-color: #8e44ad;
+  color: white;
+}
+
+.update-button:disabled {
+  cursor: not-allowed;
 }
 
 .default-text {
