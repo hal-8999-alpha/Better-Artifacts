@@ -1,167 +1,151 @@
-const express = require('express');
 const OpenAI = require('openai');
 const dotenv = require('dotenv');
 
 dotenv.config();
 
-const app = express();
-app.use(express.json());
+const openai = new OpenAI({
+  apiKey: process.env.VUE_APP_OPENAI_API_KEY
+});
 
-const client = new OpenAI({ apiKey: process.env.VUE_APP_OPENAI_API_KEY });
+const ASSISTANT_ID = 'asst_2iJ5N7yqOJwHaYOHxeMj1HYp';
 
+async function selectRelevantFiles(query, databaseContents) {
+  try {
+    // Create a thread
+    const thread = await openai.beta.threads.create();
 
+    // Add a message to the thread
+    await openai.beta.threads.messages.create(thread.id, {
+      role: "user",
+      content: `Given the following database contents representing a codebase:
+${JSON.stringify(databaseContents, null, 2)}
 
-async function retrieveThread(threadId) {
-    const allMessages = await client.beta.threads.messages.list(threadId);
-    const responseData = {
-        all_messages: []
-    };
+And the user query: "${query}"
 
-    if (allMessages.data) {
-        for (const message of allMessages.data) {
-            for (const contentItem of message.content) {
-                if (contentItem.type === 'text') {
-                    responseData.all_messages.push(contentItem.text.value);
-                    break;
-                }
-            }
-        }
+Please analyze the codebase and select the most relevant files and functions that would need to be examined or modified to address the user's query. Return your response as a JSON object with the following structure:
+{
+  "relevantFiles": [
+    {
+      "fileName": "example.py",
+      "relevantFunctions": ["function1", "function2"]
+    }
+  ],
+  "explanation": "A brief explanation of why these files and functions were selected."
+}`
+    });
+
+    // Run the assistant
+    const run = await openai.beta.threads.runs.create(thread.id, {
+      assistant_id: ASSISTANT_ID
+    });
+
+    // Wait for the run to complete
+    let runStatus = await openai.beta.threads.runs.retrieve(thread.id, run.id);
+    while (runStatus.status !== 'completed') {
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      runStatus = await openai.beta.threads.runs.retrieve(thread.id, run.id);
     }
 
-    return responseData;
+    // Retrieve the messages
+    const messages = await openai.beta.threads.messages.list(thread.id);
+
+    // Get the last assistant message
+    const lastAssistantMessage = messages.data
+      .filter(message => message.role === 'assistant')
+      .pop();
+
+    if (lastAssistantMessage) {
+      return JSON.parse(lastAssistantMessage.content[0].text.value);
+    } else {
+      throw new Error('No response from assistant');
+    }
+  } catch (error) {
+    console.error('Error in selectRelevantFiles:', error);
+    throw error;
+  }
 }
 
-async function startNewConversation(assistantId, message) {
+async function processFiles(files) {
+  const results = [];
+  for (const file of files) {
     try {
-        const thread = await client.beta.threads.create();
-        await client.beta.threads.messages.create({
-            thread_id: thread.id,
-            role: "user",
-            content: message
-        });
-        return { assistantId, threadId: thread.id };
+      const analysis = await analyzeFile(file.content, file.name);
+      results.push({
+        fileName: file.name,
+        analysis: analysis,
+        content: file.content
+      });
     } catch (error) {
-        console.error(`Error starting new conversation: ${error.message}`);
-        return { assistantId: null, threadId: null };
+      console.error(`Error processing file ${file.name}:`, error);
+      results.push({
+        fileName: file.name,
+        error: error.message
+      });
     }
+  }
+  return results;
 }
 
-async function executeRun(threadId, assistantId) {
-    try {
-        const existingAssistant = await client.beta.assistants.retrieve(assistantId);
-        const run = await client.beta.threads.runs.create({
-            thread_id: threadId,
-            assistant_id: assistantId,
-            instructions: existingAssistant.instructions
-        });
+async function analyzeFile(fileContent, fileName) {
+  try {
+    // Create a thread
+    const thread = await openai.beta.threads.create();
 
-        while (true) {
-            const updatedRun = await client.beta.threads.runs.retrieve(run.id, threadId);
+    // Add a message to the thread
+    await openai.beta.threads.messages.create(thread.id, {
+      role: "user",
+      content: `Please analyze the following file content for ${fileName}. Provide a summary of the file, list all functions with their summaries and the functions they call, and list all imports. Return the response as a JSON object with the following structure:
 
-            if (updatedRun.status === 'completed') {
-                const messages = await client.beta.threads.messages.list(threadId);
-                const messagesList = messages.data;
-                const lastMessage = messagesList[0] || null;
-                return { messagesList, lastMessage, assistantId, threadId };
-            } else if (updatedRun.status === "requires_action") {
-                const toolOutputs = [];
-                for (const toolCall of updatedRun.required_action.submit_tool_outputs.tool_calls) {
-                    const { name, arguments: args } = toolCall.function;
-                    const toolCallId = toolCall.id;
-
-                    const func = gptFunctions[name];
-                    if (typeof func === 'function') {
-                        const parsedArgs = typeof args === 'string' ? JSON.parse(args) : args;
-                        const output = func(parsedArgs);
-                        if (output !== undefined) {
-                            toolOutputs.push({
-                                tool_call_id: toolCallId,
-                                output
-                            });
-                        } else {
-                            console.log(`The function ${name} returned undefined, which is not allowed.`);
-                        }
-                    } else {
-                        console.log(`No function defined for tool: ${name}`);
-                    }
-                }
-
-                if (toolOutputs.length > 0) {
-                    await client.beta.threads.runs.submitToolOutputs(threadId, run.id, {
-                        tool_outputs: toolOutputs
-                    });
-                }
-            }
-
-            console.log(updatedRun.status);
-            await new Promise(resolve => setTimeout(resolve, 1000));
-        }
-    } catch (error) {
-        console.error(`Error executing run: ${error.message}`);
+{
+  "file_name": "example.py",
+  "file_summary": "Brief summary of the file's purpose",
+  "functions": [
+    {
+      "function_name": "example_function",
+      "summary": "Brief description of what the function does",
+      "calls": ["other_function1", "other_function2"]
     }
+  ],
+  "imports": ["import1", "import2"]
 }
 
-async function customGptResponse(req, res) {
-    const { assistant_id, thread_id, message, create, name, instructions, model, tools, files } = req.body;
+Here's the file content:
 
-    try {
-        if (create) {
-            if (!name || !instructions) {
-                return res.status(400).json({ error: "A name and instructions must be provided to create a new assistant." });
-            }
-            const newAssistantId = await createAssistant(name, instructions, model, tools, files);
-            if (!newAssistantId) {
-                return res.status(500).json({ error: "Failed to create a new assistant." });
-            }
-            if (!message) {
-                return res.json({ assistant_id: newAssistantId });
-            }
-        }
+${fileContent}`
+    });
 
-        if (!message) {
-            return res.status(400).json({ error: "No message was passed." });
-        }
+    // Run the assistant
+    const run = await openai.beta.threads.runs.create(thread.id, {
+      assistant_id: ASSISTANT_ID
+    });
 
-        let currentAssistantId = assistant_id;
-        let currentThreadId = thread_id;
-
-        if (!currentAssistantId) {
-            const { assistantId, threadId } = await startNewConversation(currentAssistantId, message);
-            if (!assistantId || !threadId) {
-                return res.status(500).json({ error: "Failed to start a new conversation." });
-            }
-            currentAssistantId = assistantId;
-            currentThreadId = threadId;
-        } else if (currentThreadId) {
-            await continueConversation(currentThreadId, currentAssistantId, message);
-        } else {
-            const { assistantId, threadId } = await startNewConversation(currentAssistantId, message);
-            if (!assistantId || !threadId) {
-                return res.status(500).json({ error: "Failed to create a new conversation." });
-            }
-            currentAssistantId = assistantId;
-            currentThreadId = threadId;
-        }
-
-        const { messagesList, lastMessage } = await executeRun(currentThreadId, currentAssistantId);
-
-        const responseData = {
-            assistant_id: currentAssistantId,
-            thread_id: currentThreadId,
-            all_messages: messagesList.map(message => 
-                message.content[0]?.type === 'text' ? message.content[0].text.value : 'No text content in a message'
-            ),
-            last_message: lastMessage?.content[0]?.type === 'text' ? lastMessage.content[0].text.value : 'No text content in the last message'
-        };
-
-        res.json(responseData);
-    } catch (error) {
-        console.error(`Error in customGptResponse: ${error.message}`);
-        res.status(500).json({ error: error.message });
+    // Wait for the run to complete
+    let runStatus = await openai.beta.threads.runs.retrieve(thread.id, run.id);
+    while (runStatus.status !== 'completed') {
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      runStatus = await openai.beta.threads.runs.retrieve(thread.id, run.id);
     }
+
+    // Retrieve the messages
+    const messages = await openai.beta.threads.messages.list(thread.id);
+
+    // Get the last assistant message
+    const lastAssistantMessage = messages.data
+      .filter(message => message.role === 'assistant')
+      .pop();
+
+    if (lastAssistantMessage) {
+      return JSON.parse(lastAssistantMessage.content[0].text.value);
+    } else {
+      throw new Error('No response from assistant');
+    }
+  } catch (error) {
+    console.error('Error in analyzeFile:', error);
+    throw error;
+  }
 }
 
-// app.post('/gpt-response', customGptResponse);
-
-// const PORT = process.env.PORT || 3000;
-// app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+module.exports = {
+  processFiles,
+  selectRelevantFiles
+};

@@ -31,7 +31,7 @@
             <div v-if="selectedMode === 'Project'" class="update-container">
               <button 
                 @click="handleUpdate" 
-                :disabled="!updateEnabled || isUpdating"
+                :disabled="!selectedDirectory || isUpdating"
                 class="update-button"
               >
                 {{ isUpdating ? 'Updating...' : 'Update' }}
@@ -45,19 +45,17 @@
         </div>
         <div class="right-controls">
           <transition name="fade">
-            <button v-if="selectedMode === 'Project'" @click="openFileExplorer" class="file-button">
-              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
-              </svg>
-            </button>
+            <div v-if="selectedMode === 'Project'" class="directory-selection">
+              <button @click="openDirectoryDialog" class="file-button">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+                </svg>
+              </button>
+              <span v-if="selectedDirectory" class="selected-directory" @click="toggleDatabaseViewer">
+                {{ selectedDirectoryName }}
+              </span>
+            </div>
           </transition>
-          <input 
-            type="file" 
-            ref="fileInput" 
-            @change="handleFileSelection" 
-            multiple 
-            style="display: none;"
-          >
           <select v-model="selectedMode" @change="handleModeChange">
             <option v-for="mode in modes" :key="mode" :value="mode">
               {{ mode }}
@@ -71,24 +69,33 @@
         </div>
       </div>
       <CodeDisplay 
+        v-if="!showDatabaseViewer"
         :codeScripts="codeScripts" 
         :activeTab="activeTab"
         @setActiveTab="setActiveTab"
         @copyCode="copyCode"
       />
+      <transition name="modal">
+      <div v-if="showDatabaseViewer" class="modal-overlay">
+        <div class="modal-content">
+          <button @click="toggleDatabaseViewer" class="close-button">&times;</button>
+          <DatabaseViewer />
+        </div>
+      </div>
+    </transition>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, computed } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import { useStore } from 'vuex';
-import { makeApiCall, startProcess } from '../services';
+import { makeApiCall, startProcess, getDatabaseContents, selectRelevantFilesAndFunctions, analyzeAndModifyCode } from '../services';
 import ConversationTabs from './ConversationTabs.vue';
-import TopControls from './TopControls.vue';
 import Conversation from './Conversation.vue';
 import UserInput from './UserInput.vue';
 import CodeDisplay from './CodeDisplay.vue';
+import DatabaseViewer from './DatabaseViewer.vue';
 
 const store = useStore();
 
@@ -98,10 +105,11 @@ const models = ['Claude', 'GPT4o'];
 const selectedModel = ref('Claude');
 const modes = ['Code', 'Chat', 'Project'];
 const selectedMode = ref('Code');
-const updateEnabled = ref(false);
-const lastUpdateTime = ref('');
+const selectedDirectory = ref(null);
+const selectedDirectoryName = ref('');
 const isUpdating = ref(false);
-const fileInput = ref(null);
+const lastUpdateTime = ref('');
+const showDatabaseViewer = ref(false);
 
 const conversationTabs = ref([
   { name: 'Conversation 1', conversation: [] }
@@ -109,6 +117,9 @@ const conversationTabs = ref([
 const activeTabIndex = ref(0);
 
 const activeConversation = computed(() => conversationTabs.value[activeTabIndex.value].conversation);
+
+const databaseContents = ref(null);
+const analysisResult = ref(null);
 
 const handleModelChange = () => {
   console.log(`Model changed to: ${selectedModel.value}`);
@@ -118,16 +129,76 @@ const handleModeChange = () => {
   console.log(`Mode changed to: ${selectedMode.value}`);
 };
 
+const openDirectoryDialog = async () => {
+  try {
+    if ('showDirectoryPicker' in window) {
+      const directoryHandle = await window.showDirectoryPicker();
+      selectedDirectory.value = directoryHandle;
+      selectedDirectoryName.value = directoryHandle.name;
+      
+      // Get all file handles in the directory and subdirectories
+      const fileHandles = await getFilesRecursively(directoryHandle);
+      
+      // Get file paths
+      const filePaths = await Promise.all(fileHandles.map(async (handle) => {
+        const relativePath = await getRelativePath(directoryHandle, handle);
+        return relativePath;
+      }));
+
+      console.log('Selected files:', filePaths);
+      selectedDirectory.value = { name: directoryHandle.name, files: filePaths };
+    } else {
+      // Fallback for browsers that don't support the File System Access API
+      alert("Your browser doesn't support directory selection. Please enter the path manually.");
+      const manualPath = prompt("Enter the full directory path:");
+      if (manualPath) {
+        selectedDirectory.value = { name: manualPath, files: [] };
+        selectedDirectoryName.value = manualPath.split('/').pop() || manualPath.split('\\').pop() || manualPath;
+      }
+    }
+  } catch (error) {
+    console.error('Error selecting directory:', error);
+    selectedDirectory.value = null;
+    selectedDirectoryName.value = '';
+  }
+};
+
+const getRelativePath = async (rootHandle, fileHandle) => {
+  const rootPath = await rootHandle.resolve(fileHandle);
+  if (!rootPath) {
+    throw new Error("File is not inside the selected directory");
+  }
+  return rootPath.join('/');
+};
+
+const getFilesRecursively = async (directoryHandle) => {
+  const files = [];
+  for await (const entry of directoryHandle.values()) {
+    if (entry.kind === 'file') {
+      files.push(entry);
+    } else if (entry.kind === 'directory') {
+      files.push(...await getFilesRecursively(entry));
+    }
+  }
+  return files;
+};
+
 const handleUpdate = async () => {
+  if (!selectedDirectory.value) {
+    console.error('No directory selected');
+    return;
+  }
+
   console.log('Update button clicked');
   isUpdating.value = true;
-  updateEnabled.value = false;
   
   try {
-    const result = await startProcess();
+    console.log('Sending directory info:', selectedDirectory.value);
+    const result = await startProcess(selectedDirectory.value);
     if (result.status === 'success') {
       console.log(result.message);
       lastUpdateTime.value = formatDate(new Date());
+      await fetchDatabaseContents();
     } else {
       console.error(result.message);
     }
@@ -151,43 +222,56 @@ const formatDate = (date) => {
   return date.toLocaleString('en-US', options);
 };
 
+const fetchDatabaseContents = async () => {
+  try {
+    databaseContents.value = await getDatabaseContents();
+    console.log('Fetched database contents:', databaseContents.value);
+  } catch (error) {
+    console.error('Error fetching database contents:', error);
+  }
+};
+
 const handleSend = async (message) => {
   if (!message.trim()) return;
 
   const currentConversation = conversationTabs.value[activeTabIndex.value].conversation;
   currentConversation.push({ role: 'user', content: message });
   
-  const response = await makeApiCall(selectedModel.value, message);
-  
-  if (selectedModel.value === 'GPT4o') {
-    const codeBlockRegex = /```[\s\S]*?```/g;
-    const codeBlocks = response.content.match(codeBlockRegex) || [];
-    let conversationText = response.content;
+  try {
+    if (!databaseContents.value) {
+      await fetchDatabaseContents();
+    }
 
-    codeBlocks.forEach((block, index) => {
-      conversationText = conversationText.replace(block, `[Code Block ${index + 1}]`);
+    // First stage: Select relevant files and functions
+    const relevantFiles = await selectRelevantFilesAndFunctions(message, databaseContents.value);
+    console.log('Relevant files:', relevantFiles);
+
+    // Second stage: Analyze and modify code
+    const result = await analyzeAndModifyCode(message, relevantFiles.relevantFiles, databaseContents.value);
+    analysisResult.value = result;
+
+    // Update the conversation with the results
+    currentConversation.push({ 
+      role: 'assistant', 
+      content: `Analysis complete. Here's a summary of the changes:
+${result.explanation}
+
+${result.modifications.map(mod => `File: ${mod.fileName}
+Changes: ${mod.changes}`).join('\n\n')}
+`
     });
 
-    currentConversation.push({ role: 'assistant', content: conversationText });
-    
-    if (codeBlocks.length > 0) {
-      codeScripts.value = codeBlocks.map(block => block.replace(/```/g, '').trim());
-    } else {
-      codeScripts.value = [];
-    }
-  } else if (selectedModel.value === 'Claude') {
-    currentConversation.push({ role: 'assistant', content: response.conversation });
-    codeScripts.value = response.codeScripts;
+    // Update code scripts with modified content
+    codeScripts.value = result.modifications.map(mod => mod.updatedContent);
+    activeTab.value = 0;
 
-    console.log('Updating tokens and cost:', response.usage);
-    store.dispatch('updateTokensAndCost', {
-      inputTokens: response.usage.input_tokens,
-      outputTokens: response.usage.output_tokens
+  } catch (error) {
+    console.error('Error processing query:', error);
+    currentConversation.push({ 
+      role: 'assistant', 
+      content: 'An error occurred while processing your request. Please try again.'
     });
   }
-
-  activeTab.value = 0;
-  updateEnabled.value = true;
 };
 
 const copyConversation = () => {
@@ -201,19 +285,6 @@ const copyConversation = () => {
     .catch(err => {
       console.error('Failed to copy conversation: ', err);
     });
-};
-
-const openFileExplorer = () => {
-  fileInput.value.click();
-};
-
-const handleFileSelection = (event) => {
-  const files = event.target.files;
-  if (files.length > 0) {
-    const fileNames = Array.from(files).map(file => file.name);
-    store.dispatch('setSelectedFiles', fileNames);
-    console.log('Selected files:', fileNames);
-  }
 };
 
 const selectTab = (index) => {
@@ -257,6 +328,14 @@ const copyCode = () => {
       });
   }
 };
+
+const toggleDatabaseViewer = () => {
+  showDatabaseViewer.value = !showDatabaseViewer.value;
+};
+
+onMounted(async () => {
+  await fetchDatabaseContents();
+});
 </script>
 
 <style scoped>
@@ -324,7 +403,7 @@ const copyCode = () => {
   justify-content: space-between;
   align-items: center;
   margin-bottom: 1rem;
-  height: 36px; /* Set a fixed height to prevent shifting */
+  height: 36px;
 }
 
 .left-controls {
@@ -421,6 +500,28 @@ select:focus {
   height: 24px;
 }
 
+.directory-selection {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.selected-directory {
+  font-size: 0.9rem;
+  color: #cccccc;
+  max-width: 150px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: color 0.3s ease;
+}
+
+.selected-directory:hover {
+  color: #ffffff;
+  text-decoration: underline;
+}
+
 /* Fade transition styles */
 .fade-enter-active, .fade-leave-active {
   transition: opacity 0.5s ease;
@@ -429,4 +530,53 @@ select:focus {
 .fade-enter-from, .fade-leave-to {
   opacity: 0;
 }
+
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.8);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.modal-content {
+  background-color: #1e1e1e;
+  padding: 2rem;
+  border-radius: 8px;
+  width: 90%;
+  height: 90%;
+  overflow-y: auto;
+  position: relative;
+}
+
+.close-button {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  font-size: 1.5rem;
+  background: none;
+  border: none;
+  color: #cccccc;
+  cursor: pointer;
+}
+
+.close-button:hover {
+  color: #ffffff;
+}
+
+.modal-enter-active,
+.modal-leave-active {
+  transition: opacity 0.3s ease;
+}
+
+.modal-enter-from,
+.modal-leave-to {
+  opacity: 0;
+}
+
 </style>

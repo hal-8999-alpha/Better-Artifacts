@@ -6,7 +6,7 @@ export const makeApiCall = async (model, userInput) => {
   try {
     if (model === 'GPT4o') {
       const response = await axios.post(`${API_URL}/openai`, {
-        model: "gpt-3.5-turbo",
+        model: "gpt-4o",
         messages: [
           {"role": "system", "content": "The chatbot should respond in a friendly manner."},
           {"role": "user", "content": userInput}
@@ -47,29 +47,70 @@ export const makeApiCall = async (model, userInput) => {
   }
 };
 
-// New function to call the start-process endpoint
-export const startProcess = async () => {
-  try {
-    const response = await axios.get(`${API_URL}/start-process`);
-    
-    if (response.status === 200) {
-      console.log('Process started successfully');
-      return {
-        status: 'success',
-        message: 'Process started successfully'
-      };
-    } else {
-      console.error('Unexpected response status:', response.status);
+export const getDatabaseContents = async () => {
+    try {
+      const response = await axios.get(`${API_URL}/database-contents`);
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching database contents:', error);
+      throw error;
+    }
+  };
+
+  export const selectRelevantFilesAndFunctions = async (query, databaseContents) => {
+    try {
+      const response = await axios.post(`${API_URL}/select-files`, {
+        query,
+        databaseContents
+      });
+  
+      return response.data;
+    } catch (error) {
+      console.error('Error selecting relevant files and functions:', error);
+      throw error;
+    }
+  };
+
+  export const analyzeAndModifyCode = async (query, selectedFiles, databaseContents) => {
+    try {
+      const response = await axios.post(`${API_URL}/analyze-modify`, {
+        query,
+        selectedFiles,
+        databaseContents
+      });
+  
+      return response.data;
+    } catch (error) {
+      console.error('Error analyzing and modifying code:', error);
+      throw error;
+    }
+  };
+
+export const startProcess = async (directoryInfo) => {
+    try {
+      console.log('Starting process with directory info:', directoryInfo);
+      const response = await axios.post(`${API_URL}/start-process`, directoryInfo);
+      
+      console.log('Server response:', response.data);
+      
+      if (response.status === 200) {
+        console.log('Process started successfully');
+        return {
+          status: 'success',
+          message: response.data.message
+        };
+      } else {
+        console.error('Unexpected response status:', response.status);
+        return {
+          status: 'error',
+          message: 'Unexpected response from server'
+        };
+      }
+    } catch (error) {
+      console.error('Error starting process:', error);
       return {
         status: 'error',
-        message: 'Unexpected response from server'
+        message: error.response?.data?.error || 'An error occurred while starting the process'
       };
     }
-  } catch (error) {
-    console.error('Error starting process:', error);
-    return {
-      status: 'error',
-      message: error.response?.data?.error || 'An error occurred while starting the process'
-    };
-  }
-};
+  };
