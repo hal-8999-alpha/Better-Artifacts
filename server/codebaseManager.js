@@ -1,7 +1,6 @@
 const fs = require('fs').promises;
 const path = require('path');
 const { Level } = require('level');
-const customGPT = require('./customGPT');
 
 let db;
 
@@ -19,52 +18,29 @@ async function closeDatabase() {
     }
 }
 
-async function startProcess(directoryName, files) {
-    console.log(`Starting process for directory: ${directoryName}`);
+async function startProcess(files, projectRoot) {
+    console.log(`Starting process for ${files.length} files`);
     try {
         await openDatabase();
         console.log('Database initialized');
 
-        // Clear the database
         await clearDatabase();
         console.log('Database cleared');
 
-        console.log(`Found ${files.length} files to process`);
-
-        // Get the parent directory of the current working directory
-        const parentDir = path.dirname(process.cwd());
-
-        const filesToAnalyze = [];
-
-        // Process each file
         for (const file of files) {
-            console.log(`Processing file: ${file}`);
-            const filePath = path.join(parentDir, directoryName, file);
-            console.log(`Resolved file path: ${filePath}`);
-            const fileContent = await readFile(filePath);
+            console.log(`Processing file: ${file.relativePath}`);
+            const fileContent = await readFile(file.absolutePath);
 
             if (fileContent !== null) {
-                filesToAnalyze.push({ name: file, content: fileContent });
+                const analysisResult = await analyzeFile(file.relativePath, fileContent);
+                await storeAnalysisResult(analysisResult, projectRoot);
+                console.log(`Completed processing and storing file: ${file.relativePath}`);
             } else {
-                console.log(`Skipped file: ${file} due to read error`);
+                console.log(`Skipped file: ${file.relativePath} due to read error`);
             }
         }
 
-        // Analyze files using GPT
-        const analysisResults = await customGPT.processFiles(filesToAnalyze);
-
-        // Store analysis results
-        for (const result of analysisResults) {
-            if (result.error) {
-                console.log(`Error analyzing file ${result.fileName}: ${result.error}`);
-            } else {
-                await storeAnalysisResult(result);
-                console.log(`Completed processing file: ${result.fileName}`);
-            }
-        }
-
-        // Generate and store the function call tree
-        const tree = await generateFunctionCallTree();
+        const tree = await generateFunctionCallTree(projectRoot);
         await db.put('functionCallTree', tree);
 
         console.log('Process completed successfully');
@@ -78,10 +54,44 @@ async function startProcess(directoryName, files) {
     }
 }
 
-async function clearDatabase() {
-    for await (const key of db.keys()) {
-        await db.del(key);
+async function analyzeFile(filePath, content) {
+    // This function now delegates to customGPT.js for analysis
+    const customGPT = require('./customGPT');
+    return await customGPT.analyzeFile(content, filePath);
+}
+
+function extractFunctions(content) {
+    // Keeping this function for backwards compatibility
+    const functionRegex = /def\s+(\w+)\s*\([^)]*\):/g;
+    const functions = [];
+    let match;
+
+    while ((match = functionRegex.exec(content)) !== null) {
+        functions.push({
+            function_name: match[1],
+            summary: `Function ${match[1]}`,
+            calls: [] // You might want to implement a way to detect function calls
+        });
     }
+
+    return functions;
+}
+
+function extractImports(content) {
+    // Keeping this function for backwards compatibility
+    const importRegex = /^(?:from\s+(\S+)\s+)?import\s+(.+)$/gm;
+    const imports = [];
+    let match;
+
+    while ((match = importRegex.exec(content)) !== null) {
+        if (match[1]) {
+            imports.push(`from ${match[1]} import ${match[2]}`);
+        } else {
+            imports.push(`import ${match[2]}`);
+        }
+    }
+
+    return imports;
 }
 
 async function readFile(filePath) {
@@ -96,40 +106,46 @@ async function readFile(filePath) {
     }
 }
 
-async function storeAnalysisResult(analysisResult) {
-    console.log(`Storing analysis result for file: ${analysisResult.fileName}`);
+async function storeAnalysisResult(analysisResult, projectRoot) {
+    console.log(`Storing analysis result for file: ${analysisResult.file_name}`);
     try {
-        // Store the raw analysis along with the full file content
-        await db.put(`file:${analysisResult.fileName}`, {
-            ...analysisResult.analysis,
-            content: analysisResult.content  // Add the full file content
-        });
+        const key = `file:${path.join(projectRoot, analysisResult.file_name)}`;
+        await db.put(key, analysisResult);
         
         // Store functions
-        for (const func of analysisResult.analysis.functions) {
-            await db.put(`function:${analysisResult.fileName}:${func.function_name}`, {
+        for (const func of analysisResult.functions) {
+            const functionKey = `function:${path.join(projectRoot, analysisResult.file_name)}:${func.function_name}`;
+            await db.put(functionKey, {
                 summary: func.summary,
                 calls: func.calls
             });
         }
         
         // Store imports
-        await db.put(`imports:${analysisResult.fileName}`, analysisResult.analysis.imports);
+        const importKey = `imports:${path.join(projectRoot, analysisResult.file_name)}`;
+        await db.put(importKey, analysisResult.imports);
     } catch (error) {
-        console.error(`Error storing analysis result for ${analysisResult.fileName}:`, error);
+        console.error(`Error storing analysis result for ${analysisResult.file_name}:`, error);
     }
 }
 
-async function generateFunctionCallTree() {
+async function clearDatabase() {
+    for await (const key of db.keys()) {
+        await db.del(key);
+    }
+}
+
+async function generateFunctionCallTree(projectRoot) {
     const tree = {};
 
     for await (const [key, value] of db.iterator()) {
         if (key.startsWith('function:')) {
             const [_, filePath, functionName] = key.split(':');
-            if (!tree[filePath]) {
-                tree[filePath] = {};
+            const relativePath = path.relative(projectRoot, filePath);
+            if (!tree[relativePath]) {
+                tree[relativePath] = {};
             }
-            tree[filePath][functionName] = value.calls;
+            tree[relativePath][functionName] = value.calls;
         }
     }
 
@@ -144,12 +160,28 @@ async function getDatabaseContents() {
             files: {},
             functions: {},
             imports: {},
-            functionCallTree: {}
+            functionCallTree: {},
+            fileStructure: {} // New field to store file structure
         };
 
         for await (const [key, value] of db.iterator()) {
             if (key.startsWith('file:')) {
-                contents.files[key.slice(5)] = value;
+                const filePath = key.slice(5);
+                contents.files[filePath] = value;
+                
+                // Build file structure
+                const pathParts = filePath.split('/');
+                let currentLevel = contents.fileStructure;
+                pathParts.forEach((part, index) => {
+                    if (index === pathParts.length - 1) {
+                        currentLevel[part] = 'file';
+                    } else {
+                        if (!currentLevel[part]) {
+                            currentLevel[part] = {};
+                        }
+                        currentLevel = currentLevel[part];
+                    }
+                });
             } else if (key.startsWith('function:')) {
                 const [_, filePath, functionName] = key.split(':');
                 if (!contents.functions[filePath]) {
@@ -162,6 +194,8 @@ async function getDatabaseContents() {
                 contents.functionCallTree = value;
             }
         }
+
+        console.log('Retrieved database contents:', JSON.stringify(contents, null, 2));
 
         return contents;
     } catch (error) {
