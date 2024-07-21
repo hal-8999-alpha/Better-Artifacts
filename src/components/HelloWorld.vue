@@ -95,7 +95,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, watch } from 'vue';
 import { useStore } from 'vuex';
 import { makeApiCall, startProcess, getDatabaseContents, selectRelevantFilesAndFunctions, analyzeAndModifyCode } from '../services';
 import ConversationTabs from './ConversationTabs.vue';
@@ -105,8 +105,6 @@ import CodeDisplay from './CodeDisplay.vue';
 import DatabaseViewer from './DatabaseViewer.vue';
 import { readFileAsText } from '../utils/fileUtils';
 import ApiKeyModal from './ApiKeyModal.vue';
-
-
 
 const store = useStore();
 
@@ -122,7 +120,6 @@ const selectedDirectoryName = ref('');
 const isUpdating = ref(false);
 const lastUpdateTime = ref('');
 const showDatabaseViewer = ref(false);
-
 
 const conversationTabs = ref([
   { name: 'Conversation 1', conversation: [] }
@@ -142,16 +139,19 @@ const activeConversation = computed(() => conversationTabs.value[activeTabIndex.
 const databaseContents = ref(null);
 const analysisResult = ref(null);
 
-const handleModelChange = () => {
-  console.log(`Model changed to: ${selectedModel.value}`);
-};
-
 const handleModeChange = () => {
   console.log(`Mode changed to: ${selectedMode.value}`);
+  store.dispatch('setSelectedMode', selectedMode.value);
+  // Reset or adjust UI elements based on the selected mode
+  if (selectedMode.value !== 'Project') {
+    selectedDirectory.value = null;
+    selectedDirectoryName.value = '';
+    databaseContents.value = null;
+    analysisResult.value = null;
+  }
+  // Clear the current conversation when changing modes
+  clearConversation();
 };
-
-
-
 
 const openDirectoryDialog = async () => {
   try {
@@ -288,12 +288,51 @@ const handleSend = async (message) => {
   currentConversation.push({ role: 'user', content: message });
   
   try {
-    // Attempt to fetch database contents if they're not available
+    let response;
+    switch (selectedMode.value) {
+      case 'Project':
+        response = await handleProjectMode(message);
+        break;
+      case 'Chat':
+        response = await handleChatMode(message);
+        break;
+      case 'Code':
+        response = await handleCodeMode(message);
+        break;
+      default:
+        throw new Error(`Invalid mode: ${selectedMode.value}`);
+    }
+
+    currentConversation.push(response);
+
+    if (response.codeScripts) {
+      codeScripts.value = response.codeScripts;
+      activeTab.value = 0;
+    }
+
+    // Update token count and cost (you may need to adjust this based on the actual response structure)
+    if (response.usage) {
+      store.dispatch('updateTokensAndCost', {
+        inputTokens: response.usage.input_tokens,
+        outputTokens: response.usage.output_tokens
+      });
+    }
+
+  } catch (error) {
+    console.error(`Error in ${selectedMode.value} mode:`, error);
+    currentConversation.push({ 
+      role: 'assistant', 
+      content: `An error occurred while processing your request: ${error.message}`
+    });
+  }
+};
+
+const handleProjectMode = async (message) => {
+  try {
     if (!databaseContents.value || Object.keys(databaseContents.value.files).length === 0) {
       console.log('Database contents not available, attempting to fetch...');
       await fetchDatabaseContents();
       
-      // Check again if database contents are available
       if (!databaseContents.value || Object.keys(databaseContents.value.files).length === 0) {
         throw new Error('Database contents are empty. Please ensure files are uploaded and processed correctly.');
       }
@@ -307,6 +346,12 @@ const handleSend = async (message) => {
 
     // Second stage: Analyze and modify code
     const result = await analyzeAndModifyCode(message, relevantFiles.relevantFiles, databaseContents.value);
+    console.log('Analysis result:', result);
+    
+    if (!result || !result.explanation || !result.modifications) {
+      throw new Error('Received invalid response from the coding LLM. Please try again.');
+    }
+    
     analysisResult.value = result;
 
     // Format the response
@@ -325,33 +370,44 @@ Changes: ${mod.changes}
 To see the updated code, please check the code display panel.
     `.trim();
 
-    // Update the conversation with the formatted results
-    currentConversation.push({ 
+    return { 
       role: 'assistant', 
-      content: formattedResponse
-    });
-
-    // Update code scripts with modified content
-    codeScripts.value = result.modifications.flatMap(mod => 
-      mod.scripts.map(script => {
-        // Check if content is an array, if so, join it
-        let contentStr = Array.isArray(script.content) ? script.content.join('\n') : script.content;
-        // Remove 'SCRIPT_X' and 'python' lines
-        contentStr = contentStr.replace(/^SCRIPT_\d+\n/, '').replace(/^python\n/, '');
-        return contentStr.trim();
-      })
-    );
-    activeTab.value = 0;
-
-    console.log('Updated codeScripts:', codeScripts.value);
-
+      content: formattedResponse,
+      codeScripts: result.modifications.flatMap(mod => 
+        mod.scripts.map(script => {
+          let contentStr = Array.isArray(script.content) ? script.content.join('\n') : script.content;
+          contentStr = contentStr.replace(/^SCRIPT_\d+\n/, '').replace(/^python\n/, '');
+          return contentStr.trim();
+        })
+      )
+    };
   } catch (error) {
-    console.error('Error processing query:', error);
-    currentConversation.push({ 
-      role: 'assistant', 
-      content: `An error occurred while processing your request: ${error.message}. Please ensure that files are uploaded and processed correctly before querying.`
-    });
+    console.error('Error in handleProjectMode:', error);
+    return {
+      role: 'assistant',
+      content: `An error occurred while processing your request: ${error.message}. Please try again or contact support if the issue persists.`
+    };
   }
+};
+
+const handleChatMode = async (message) => {
+  const response = await makeApiCall(selectedMode.value, selectedModel.value, message);
+  console.log('Chat mode response:', response); // Add this line for debugging
+  return {
+    role: 'assistant',
+    content: response.conversation || response.content || "No response content",
+    usage: response.usage
+  };
+};
+
+const handleCodeMode = async (message) => {
+  const response = await makeApiCall(selectedMode.value, selectedModel.value, message);
+  return {
+    role: 'assistant',
+    content: response.conversation || response.content,
+    codeScripts: response.codeScripts || [response.content],
+    usage: response.usage
+  };
 };
 
 const copyConversation = () => {
@@ -415,6 +471,11 @@ const toggleDatabaseViewer = () => {
 
 onMounted(async () => {
   await fetchDatabaseContents();
+});
+
+// Watch for changes in selectedMode and update the store
+watch(selectedMode, (newMode) => {
+  store.commit('SET_SELECTED_MODE', newMode);
 });
 </script>
 

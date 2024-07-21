@@ -5,7 +5,8 @@ export default createStore({
     totalInputTokens: 0,
     totalOutputTokens: 0,
     totalCost: 0,
-    selectedFiles: []
+    selectedFiles: [],
+    selectedMode: 'Code' // Add this line to track the selected mode
   },
   getters: {
     getTotalTokens: (state) => {
@@ -18,6 +19,9 @@ export default createStore({
     },
     getSelectedFiles: (state) => {
       return state.selectedFiles;
+    },
+    getSelectedMode: (state) => { // Add this getter
+      return state.selectedMode;
     }
   },
   mutations: {
@@ -32,6 +36,9 @@ export default createStore({
     },
     SET_SELECTED_FILES(state, files) {
       state.selectedFiles = files;
+    },
+    SET_SELECTED_MODE(state, mode) { // Add this mutation
+      state.selectedMode = mode;
     }
   },
   actions: {
@@ -47,6 +54,9 @@ export default createStore({
     },
     setSelectedFiles({ commit }, files) {
       commit('SET_SELECTED_FILES', files);
+    },
+    setSelectedMode({ commit }, mode) { // Add this action
+      commit('SET_SELECTED_MODE', mode);
     }
   },
   modules: {

@@ -2,8 +2,50 @@ const axios = require('axios');
 
 const API_URL = 'http://localhost:3000/api';
 
-const makeApiCall = async (model, userInput) => {
-  try {
+const makeApiCall = async (mode, model, userInput) => {
+    try {
+      let response;
+      console.log(`Making API call for mode: ${mode}, model: ${model}`);
+      switch (mode) {
+        case 'Project':
+          response = await makeProjectApiCall(model, userInput);
+          console.log('Project API call response:', response);
+          return response;
+        case 'Chat':
+          response = await makeChatApiCall(model, userInput);
+          console.log('Chat API call response:', response);
+          return {
+            content: response.content || response.conversation,
+            usage: response.usage
+          };
+        case 'Code':
+          response = await makeCodeApiCall(model, userInput);
+          console.log('Code API call response:', response);
+          return {
+            content: response.content || response.conversation,
+            codeScripts: response.codeScripts,
+            usage: response.usage
+          };
+        default:
+          throw new Error(`Invalid mode: ${mode}`);
+      }
+    } catch (error) {
+      console.error(`Error making API call for ${mode} mode:`, error);
+      console.error('Error details:', error.response ? error.response.data : 'No response data');
+      throw error;
+    }
+  };
+
+  const makeCodeApiCall = async (model, userInput) => {
+    console.log('Making code API call with model:', model);
+    const endpoint = `${API_URL}/code`;
+    const response = await axios.post(endpoint, { model, message: userInput });
+    console.log('Code API response:', response.data);
+    return response.data;
+  };
+  
+  const makeProjectApiCall = async (model, userInput) => {
+    console.log('Making project API call with model:', model);
     if (model === 'GPT4o') {
       const response = await axios.post(`${API_URL}/openai`, {
         model: "gpt-4o",
@@ -12,6 +54,7 @@ const makeApiCall = async (model, userInput) => {
           {"role": "user", "content": userInput}
         ]
       });
+      console.log('GPT4o response:', response.data);
       return {
         content: response.data.choices[0].message.content,
         role: 'assistant'
@@ -31,6 +74,7 @@ const makeApiCall = async (model, userInput) => {
           }
         ]
       });
+      console.log('Claude response:', response.data);
       return {
         conversation: response.data.conversation,
         codeScripts: response.data.codeScripts,
@@ -38,14 +82,48 @@ const makeApiCall = async (model, userInput) => {
         role: 'assistant'
       };
     }
-  } catch (error) {
-    console.error('Error making API call:', error);
-    return {
-      content: 'An error occurred while processing your request.',
-      role: 'assistant'
+    throw new Error(`Unsupported model for project mode: ${model}`);
+  };
+
+  const makeChatApiCall = async (model, userInput) => {
+    const endpoint = model === 'GPT4o' ? `${API_URL}/openai` : `${API_URL}/anthropic`;
+    const systemMessage = "You are a helpful assistant engaging in general conversation.";
+    
+    const payload = model === 'GPT4o' ? {
+      model: "gpt-4o",
+      messages: [
+        {"role": "system", "content": systemMessage},
+        {"role": "user", "content": userInput}
+      ]
+    } : {
+      system: systemMessage,
+      messages: [
+        {
+          role: "user",
+          content: [
+            {
+              type: "text",
+              text: userInput
+            }
+          ]
+        }
+      ]
     };
-  }
-};
+  
+    const response = await axios.post(endpoint, payload);
+  
+    if (model === 'GPT4o') {
+      return {
+        content: response.data.choices[0].message.content,
+        usage: response.data.usage
+      };
+    } else {
+      return {
+        conversation: response.data.conversation,
+        usage: response.data.usage
+      };
+    }
+  };
 
 const startProcess = async (formData) => {
   try {
