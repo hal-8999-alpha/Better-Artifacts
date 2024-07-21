@@ -2,14 +2,21 @@
     <div class="content">
       <div v-for="(message, index) in conversation" :key="index" :class="{ 'message-space': index > 0 }">
         <p :class="{ 'user-message': message.role === 'user', 'ai-message': message.role === 'assistant' }">
-          {{ message.content }}
+          <span v-if="message.role === 'user'">{{ message.content }}</span>
+          <span v-else v-html="formatMessage(message.content)"></span>
         </p>
       </div>
     </div>
   </template>
   
   <script setup>
-  defineProps(['conversation']);
+  import { defineProps } from 'vue';
+  
+  const props = defineProps(['conversation']);
+  
+  const formatMessage = (content) => {
+    return content.replace(/\n/g, '<br>');
+  };
   </script>
   
   <style scoped>
@@ -43,6 +50,7 @@
   .user-message, .ai-message {
     text-align: left;
     margin-bottom: 0.5rem;
+    white-space: pre-wrap;
   }
   
   .user-message {

@@ -69,12 +69,12 @@
         </div>
       </div>
       <CodeDisplay 
-        v-if="!showDatabaseViewer"
-        :codeScripts="codeScripts" 
-        :activeTab="activeTab"
-        @setActiveTab="setActiveTab"
-        @copyCode="copyCode"
-      />
+  v-if="!showDatabaseViewer"
+  :codeScripts="codeScripts" 
+  :activeTab="activeTab"
+  @setActiveTab="setActiveTab"
+  @copyCode="copyCode"
+/>
       <transition name="modal">
       <div v-if="showDatabaseViewer" class="modal-overlay">
         <div class="modal-content">
@@ -136,25 +136,17 @@ const openDirectoryDialog = async () => {
       selectedDirectory.value = directoryHandle;
       selectedDirectoryName.value = directoryHandle.name;
       
-      // Get all file handles in the directory and subdirectories
-      const fileHandles = await getFilesRecursively(directoryHandle);
+      // Get all files in the directory and subdirectories
+      const files = await getFilesRecursively(directoryHandle);
       
-      // Get file paths
-      const filePaths = await Promise.all(fileHandles.map(async (handle) => {
-        const relativePath = await getRelativePath(directoryHandle, handle);
-        return relativePath;
-      }));
-
-      console.log('Selected files:', filePaths);
-      selectedDirectory.value = { name: directoryHandle.name, files: filePaths };
+      console.log('Selected files:', files);
+      
+      selectedDirectory.value = { 
+        name: directoryHandle.name, 
+        files: files 
+      };
     } else {
-      // Fallback for browsers that don't support the File System Access API
-      alert("Your browser doesn't support directory selection. Please enter the path manually.");
-      const manualPath = prompt("Enter the full directory path:");
-      if (manualPath) {
-        selectedDirectory.value = { name: manualPath, files: [] };
-        selectedDirectoryName.value = manualPath.split('/').pop() || manualPath.split('\\').pop() || manualPath;
-      }
+      alert("Your browser doesn't support directory selection. Please use a modern browser.");
     }
   } catch (error) {
     console.error('Error selecting directory:', error);
@@ -163,21 +155,18 @@ const openDirectoryDialog = async () => {
   }
 };
 
-const getRelativePath = async (rootHandle, fileHandle) => {
-  const rootPath = await rootHandle.resolve(fileHandle);
-  if (!rootPath) {
-    throw new Error("File is not inside the selected directory");
-  }
-  return rootPath.join('/');
-};
-
-const getFilesRecursively = async (directoryHandle) => {
+const getFilesRecursively = async (directoryHandle, path = '') => {
   const files = [];
   for await (const entry of directoryHandle.values()) {
+    const entryPath = path ? `${path}/${entry.name}` : entry.name;
     if (entry.kind === 'file') {
-      files.push(entry);
+      const file = await entry.getFile();
+      files.push({
+        file: file,
+        path: entryPath
+      });
     } else if (entry.kind === 'directory') {
-      files.push(...await getFilesRecursively(entry));
+      files.push(...await getFilesRecursively(entry, entryPath));
     }
   }
   return files;
@@ -193,22 +182,33 @@ const handleUpdate = async () => {
   isUpdating.value = true;
   
   try {
-    console.log('Sending directory info:', selectedDirectory.value);
-    const result = await startProcess(selectedDirectory.value);
+    const formData = new FormData();
+    formData.append('rootDirectory', selectedDirectory.value.name);
+    selectedDirectory.value.files.forEach((fileInfo) => {
+      // Append the file with its full path
+      formData.append('files', fileInfo.file, fileInfo.path);
+      // Also append the path separately to ensure it's sent correctly
+      formData.append('filePaths', fileInfo.path);
+    });
+
+    console.log('Sending files:', selectedDirectory.value.files.map(f => f.path));
+
+    const result = await startProcess(formData);
     if (result.status === 'success') {
       console.log(result.message);
       lastUpdateTime.value = formatDate(new Date());
-      await fetchDatabaseContents();
+      await fetchDatabaseContents(); // Fetch database contents immediately after successful upload
     } else {
       console.error(result.message);
+      throw new Error(result.message);
     }
   } catch (error) {
     console.error('Error during update:', error);
+    // You might want to show this error to the user in the UI
   } finally {
     isUpdating.value = false;
   }
 };
-
 const formatDate = (date) => {
   const options = {
     year: 'numeric',
@@ -224,10 +224,16 @@ const formatDate = (date) => {
 
 const fetchDatabaseContents = async () => {
   try {
+    console.log('Fetching database contents...');
     databaseContents.value = await getDatabaseContents();
     console.log('Fetched database contents:', databaseContents.value);
+    
+    if (!databaseContents.value || Object.keys(databaseContents.value.files).length === 0) {
+      console.warn('Database contents are empty after fetching.');
+    }
   } catch (error) {
     console.error('Error fetching database contents:', error);
+    throw new Error('Failed to fetch database contents. Please try uploading files again.');
   }
 };
 
@@ -238,9 +244,18 @@ const handleSend = async (message) => {
   currentConversation.push({ role: 'user', content: message });
   
   try {
-    if (!databaseContents.value) {
+    // Attempt to fetch database contents if they're not available
+    if (!databaseContents.value || Object.keys(databaseContents.value.files).length === 0) {
+      console.log('Database contents not available, attempting to fetch...');
       await fetchDatabaseContents();
+      
+      // Check again if database contents are available
+      if (!databaseContents.value || Object.keys(databaseContents.value.files).length === 0) {
+        throw new Error('Database contents are empty. Please ensure files are uploaded and processed correctly.');
+      }
     }
+
+    console.log('Database contents:', databaseContents.value);
 
     // First stage: Select relevant files and functions
     const relevantFiles = await selectRelevantFilesAndFunctions(message, databaseContents.value);
@@ -250,26 +265,47 @@ const handleSend = async (message) => {
     const result = await analyzeAndModifyCode(message, relevantFiles.relevantFiles, databaseContents.value);
     analysisResult.value = result;
 
-    // Update the conversation with the results
-    currentConversation.push({ 
-      role: 'assistant', 
-      content: `Analysis complete. Here's a summary of the changes:
+    // Format the response
+    const formattedResponse = `
+Analysis complete. Here's a summary of the changes:
+
+Explanation:
 ${result.explanation}
 
-${result.modifications.map(mod => `File: ${mod.fileName}
-Changes: ${mod.changes}`).join('\n\n')}
-`
+Modifications:
+${result.modifications.map(mod => `
+File: ${mod.fileName.split('\\').pop()}
+Changes: ${mod.changes}
+`).join('\n')}
+
+To see the updated code, please check the code display panel.
+    `.trim();
+
+    // Update the conversation with the formatted results
+    currentConversation.push({ 
+      role: 'assistant', 
+      content: formattedResponse
     });
 
     // Update code scripts with modified content
-    codeScripts.value = result.modifications.map(mod => mod.updatedContent);
+    codeScripts.value = result.modifications.flatMap(mod => 
+      mod.scripts.map(script => {
+        // Check if content is an array, if so, join it
+        let contentStr = Array.isArray(script.content) ? script.content.join('\n') : script.content;
+        // Remove 'SCRIPT_X' and 'python' lines
+        contentStr = contentStr.replace(/^SCRIPT_\d+\n/, '').replace(/^python\n/, '');
+        return contentStr.trim();
+      })
+    );
     activeTab.value = 0;
+
+    console.log('Updated codeScripts:', codeScripts.value);
 
   } catch (error) {
     console.error('Error processing query:', error);
     currentConversation.push({ 
       role: 'assistant', 
-      content: 'An error occurred while processing your request. Please try again.'
+      content: `An error occurred while processing your request: ${error.message}. Please ensure that files are uploaded and processed correctly before querying.`
     });
   }
 };

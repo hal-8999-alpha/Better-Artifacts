@@ -2,7 +2,7 @@
     <div class="code-display">
       <div class="formatted-code">
         <p v-if="codeScripts.length === 0" class="default-text">Generated Code Will Go Here</p>
-        <pre v-else><code>{{ codeScripts[activeTab] }}</code></pre>
+        <pre v-else><code>{{ currentScriptContent }}</code></pre>
         <button v-if="codeScripts.length > 0" @click="$emit('copyCode')" class="copy-button code-copy-button">
           <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
@@ -25,8 +25,16 @@
   </template>
   
   <script setup>
-  defineProps(['codeScripts', 'activeTab']);
+  import { computed } from 'vue';
+  
+  const props = defineProps(['codeScripts', 'activeTab']);
   defineEmits(['setActiveTab', 'copyCode']);
+  
+  const currentScriptContent = computed(() => {
+    if (props.codeScripts.length === 0) return '';
+    const content = props.codeScripts[props.activeTab];
+    return content;
+  });
   </script>
   
   <style scoped>
