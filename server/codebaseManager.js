@@ -1,6 +1,7 @@
 const fs = require('fs').promises;
 const path = require('path');
 const { Level } = require('level');
+const customGPT = require('./customGPT');
 
 let db;
 
@@ -55,13 +56,11 @@ async function startProcess(files, projectRoot) {
 }
 
 async function analyzeFile(filePath, content) {
-    // This function now delegates to customGPT.js for analysis
-    const customGPT = require('./customGPT');
     return await customGPT.analyzeFile(content, filePath);
 }
 
+// Keeping these functions for backwards compatibility
 function extractFunctions(content) {
-    // Keeping this function for backwards compatibility
     const functionRegex = /def\s+(\w+)\s*\([^)]*\):/g;
     const functions = [];
     let match;
@@ -78,7 +77,6 @@ function extractFunctions(content) {
 }
 
 function extractImports(content) {
-    // Keeping this function for backwards compatibility
     const importRegex = /^(?:from\s+(\S+)\s+)?import\s+(.+)$/gm;
     const imports = [];
     let match;
@@ -110,7 +108,12 @@ async function storeAnalysisResult(analysisResult, projectRoot) {
     console.log(`Storing analysis result for file: ${analysisResult.file_name}`);
     try {
         const key = `file:${path.join(projectRoot, analysisResult.file_name)}`;
-        await db.put(key, analysisResult);
+        await db.put(key, {
+            ...analysisResult,
+            content: analysisResult.content
+        });
+        
+        console.log(`Stored file content (first 100 chars): ${analysisResult.content.substring(0, 100)}`);
         
         // Store functions
         for (const func of analysisResult.functions) {
@@ -124,6 +127,8 @@ async function storeAnalysisResult(analysisResult, projectRoot) {
         // Store imports
         const importKey = `imports:${path.join(projectRoot, analysisResult.file_name)}`;
         await db.put(importKey, analysisResult.imports);
+        
+        console.log(`Successfully stored analysis result for file: ${analysisResult.file_name}`);
     } catch (error) {
         console.error(`Error storing analysis result for ${analysisResult.file_name}:`, error);
     }
@@ -161,7 +166,7 @@ async function getDatabaseContents() {
             functions: {},
             imports: {},
             functionCallTree: {},
-            fileStructure: {} // New field to store file structure
+            fileStructure: {}
         };
 
         for await (const [key, value] of db.iterator()) {

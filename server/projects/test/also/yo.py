@@ -1,9 +1,11 @@
-
-from hello import say_hello
+from ..goodbye import say_goodbye
+from ..hello import say_hello
+from ..blah import say_blah
 
 def say_yo():
     say_hello()
-    print("Yo!")
-
-if __name__ == "__main__":
-    say_yo
+    print('Yo!')
+    say_blah()
+    print('CHANGED')
+    say_blah()  # Added second call to say_blah()
+    say_goodbye()

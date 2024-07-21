@@ -1,6 +1,7 @@
 <template>
     <div class="database-viewer">
       <h1 class="title">Database Contents</h1>
+      <button @click="refreshContents" class="refresh-button">Refresh Contents</button>
       <div v-if="loading" class="loading">
         <div class="spinner"></div>
         Loading...
@@ -67,6 +68,11 @@
                 </ul>
                 <span v-else>No imports found</span>
               </div>
+              <div class="detail">
+                <span class="label">File Content:</span>
+                <pre v-if="fileData.content" class="code-content">{{ fileData.content }}</pre>
+                <span v-else>No content available</span>
+              </div>
             </template>
           </div>
         </div>
@@ -75,11 +81,17 @@
   </template>
   
   <script>
-  import { ref, reactive, onMounted, computed } from 'vue';
+  import { ref, reactive, onMounted, computed, watch } from 'vue';
   import { getDatabaseContents } from '../services';
   
   export default {
-    setup() {
+    props: {
+      refreshTrigger: {
+        type: Number,
+        default: 0
+      }
+    },
+    setup(props) {
       const contents = ref(null);
       const loading = ref(true);
       const error = ref(null);
@@ -105,19 +117,35 @@
         return treeData;
       });
   
-      onMounted(async () => {
+      const fetchContents = async () => {
+        loading.value = true;
+        error.value = null;
         try {
           contents.value = await getDatabaseContents();
           console.log('Raw Database Contents:', JSON.stringify(contents.value, null, 2));
           
           for (const key in contents.value.files) {
-            expandedCards[key] = false;
+            if (!(key in expandedCards)) {
+              expandedCards[key] = false;
+            }
           }
         } catch (e) {
           error.value = e.message;
         } finally {
           loading.value = false;
         }
+      };
+  
+      const refreshContents = () => {
+        fetchContents();
+      };
+  
+      onMounted(() => {
+        fetchContents();
+      });
+  
+      watch(() => props.refreshTrigger, () => {
+        fetchContents();
       });
   
       return {
@@ -126,7 +154,8 @@
         error,
         expandedCards,
         toggleCard,
-        processedTreeData
+        processedTreeData,
+        refreshContents
       };
     }
   };
@@ -283,7 +312,6 @@
     display: none;
   }
   
-  /* Styles for the control flow tree */
   .link {
     fill: none;
     stroke: #555;
@@ -305,25 +333,56 @@
   .node--internal text {
     text-shadow: 0 1px 0 #000, 0 -1px 0 #000, 1px 0 0 #000, -1px 0 0 #000;
   }
-
+  
   .tree-container {
-  background-color: #2d2d2d;
-  padding: 1rem;
-  border-radius: 8px;
-  max-height: 400px;
-  overflow-y: auto;
-}
-
-.tree-container ul {
-  list-style-type: none;
-  padding-left: 20px;
-}
-
-.tree-container li {
-  margin-bottom: 5px;
-}
-
-.tree-container > ul {
-  padding-left: 0;
-}
+    background-color: #2d2d2d;
+    padding: 1rem;
+    border-radius: 8px;
+    max-height: 400px;
+    overflow-y: auto;
+  }
+  
+  .tree-container ul {
+    list-style-type: none;
+    padding-left: 20px;
+  }
+  
+  .tree-container li {
+    margin-bottom: 5px;
+  }
+  
+  .tree-container > ul {
+    padding-left: 0;
+  }
+  
+  .code-content {
+    background-color: #1e1e1e;
+    border: 1px solid #333;
+    border-radius: 4px;
+    padding: 1rem;
+    white-space: pre-wrap;
+    word-break: break-all;
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 0.9em;
+    max-height: 300px;
+    overflow-y: auto;
+  }
+  
+  .refresh-button {
+    background-color: #4CAF50;
+    border: none;
+    color: white;
+    padding: 10px 20px;
+    text-align: center;
+    text-decoration: none;
+    display: inline-block;
+    font-size: 16px;
+    margin: 4px 2px;
+    cursor: pointer;
+    border-radius: 4px;
+  }
+  
+  .refresh-button:hover {
+    background-color: #45a049;
+  }
   </style>

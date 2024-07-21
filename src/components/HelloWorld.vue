@@ -96,6 +96,7 @@ import Conversation from './Conversation.vue';
 import UserInput from './UserInput.vue';
 import CodeDisplay from './CodeDisplay.vue';
 import DatabaseViewer from './DatabaseViewer.vue';
+import { readFileAsText } from '../utils/fileUtils';
 
 const store = useStore();
 
@@ -110,6 +111,7 @@ const selectedDirectoryName = ref('');
 const isUpdating = ref(false);
 const lastUpdateTime = ref('');
 const showDatabaseViewer = ref(false);
+
 
 const conversationTabs = ref([
   { name: 'Conversation 1', conversation: [] }
@@ -143,6 +145,7 @@ const openDirectoryDialog = async () => {
       
       selectedDirectory.value = { 
         name: directoryHandle.name, 
+        handle: directoryHandle,
         files: files 
       };
     } else {
@@ -160,9 +163,8 @@ const getFilesRecursively = async (directoryHandle, path = '') => {
   for await (const entry of directoryHandle.values()) {
     const entryPath = path ? `${path}/${entry.name}` : entry.name;
     if (entry.kind === 'file') {
-      const file = await entry.getFile();
       files.push({
-        file: file,
+        handle: entry,
         path: entryPath
       });
     } else if (entry.kind === 'directory') {
@@ -184,20 +186,30 @@ const handleUpdate = async () => {
   try {
     const formData = new FormData();
     formData.append('rootDirectory', selectedDirectory.value.name);
-    selectedDirectory.value.files.forEach((fileInfo) => {
-      // Append the file with its full path
-      formData.append('files', fileInfo.file, fileInfo.path);
-      // Also append the path separately to ensure it's sent correctly
-      formData.append('filePaths', fileInfo.path);
-    });
+
+    // Read the current content of each file
+    for (const fileInfo of selectedDirectory.value.files) {
+      try {
+        console.log(`Reading file: ${fileInfo.path}`);
+        const file = await fileInfo.handle.getFile();
+        const currentContent = await file.text();
+        console.log(`File content read successfully for: ${fileInfo.path}`);
+        const blob = new Blob([currentContent], { type: 'text/plain' });
+        formData.append('files', blob, fileInfo.path);
+        formData.append('filePaths', fileInfo.path);
+      } catch (readError) {
+        console.error(`Error reading file ${fileInfo.path}:`, readError);
+        throw new Error(`Failed to read file ${fileInfo.path}`);
+      }
+    }
 
     console.log('Sending files:', selectedDirectory.value.files.map(f => f.path));
 
     const result = await startProcess(formData);
-    if (result.status === 'success') {
+    if (result.success) {
       console.log(result.message);
       lastUpdateTime.value = formatDate(new Date());
-      await fetchDatabaseContents(); // Fetch database contents immediately after successful upload
+      await fetchDatabaseContents();
     } else {
       console.error(result.message);
       throw new Error(result.message);

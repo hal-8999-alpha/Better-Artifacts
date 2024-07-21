@@ -1,5 +1,3 @@
-2024/07/20-20:00:02.293 50bc Recovering log #5
-2024/07/20-20:00:02.294 50bc Level-0 table #7: started
-2024/07/20-20:00:02.295 50bc Level-0 table #7: 1312 bytes OK
-2024/07/20-20:00:02.301 50bc Delete type=0 #5
-2024/07/20-20:00:02.302 50bc Delete type=3 #4
+2024/07/21-07:54:35.117 32a0 Recovering log #84
+2024/07/21-07:54:35.122 32a0 Delete type=0 #84
+2024/07/21-07:54:35.122 32a0 Delete type=3 #82
