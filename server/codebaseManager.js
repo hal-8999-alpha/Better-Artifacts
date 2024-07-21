@@ -2,25 +2,54 @@ const fs = require('fs').promises;
 const path = require('path');
 const { Level } = require('level');
 const customGPT = require('./customGPT');
-const crypto = require('crypto'); // Add this line to import the crypto module
+const crypto = require('crypto');
 
 let db;
+const DB_PATH = path.join(__dirname, 'codebase-db');
+
+async function ensureDatabaseDirectory() {
+    try {
+        await fs.access(DB_PATH);
+    } catch (error) {
+        if (error.code === 'ENOENT') {
+            await fs.mkdir(DB_PATH, { recursive: true });
+            console.log('Database directory created:', DB_PATH);
+        } else {
+            console.error('Error accessing database directory:', error);
+            throw error;
+        }
+    }
+}
 
 async function openDatabase() {
     if (!db) {
-        db = new Level('./codebase-db', { valueEncoding: 'json' });
-        await db.open();
+        try {
+            await ensureDatabaseDirectory();
+            db = new Level(DB_PATH, { valueEncoding: 'json' });
+            await db.open();
+            console.log('Database opened successfully:', DB_PATH);
+        } catch (error) {
+            console.error('Error opening database:', error);
+            if (error.code === 'LEVEL_IO_ERROR') {
+                console.error('IO Error details:', error.cause);
+            }
+            throw error;
+        }
     }
 }
 
 async function closeDatabase() {
     if (db) {
-        await db.close();
-        db = null;
+        try {
+            await db.close();
+            console.log('Database closed successfully');
+            db = null;
+        } catch (error) {
+            console.error('Error closing database:', error);
+        }
     }
 }
 
-// New function to calculate file hash
 async function calculateFileHash(filePath) {
     const fileBuffer = await fs.readFile(filePath);
     const hashSum = crypto.createHash('sha256');
@@ -62,14 +91,15 @@ async function startProcess(files, projectRoot) {
         return true;
     } catch (error) {
         console.error('Error in startProcess:', error);
+        if (error.code === 'LEVEL_DATABASE_NOT_OPEN') {
+            console.error('Database failed to open. Please check the database directory permissions.');
+        }
         return false;
     } finally {
         await closeDatabase();
-        console.log('Database closed');
     }
 }
 
-// New function to get stored hash
 async function getStoredHash(relativePath) {
     try {
         const key = `hash:${relativePath}`;
@@ -86,7 +116,6 @@ async function analyzeFile(filePath, content) {
     return await customGPT.analyzeFile(content, filePath);
 }
 
-// Keeping these functions for backwards compatibility
 function extractFunctions(content) {
     const functionRegex = /def\s+(\w+)\s*\([^)]*\):/g;
     const functions = [];
@@ -96,7 +125,7 @@ function extractFunctions(content) {
         functions.push({
             function_name: match[1],
             summary: `Function ${match[1]}`,
-            calls: [] // You might want to implement a way to detect function calls
+            calls: []
         });
     }
 
@@ -140,13 +169,11 @@ async function storeAnalysisResult(analysisResult, projectRoot, fileHash) {
             content: analysisResult.content
         });
         
-        // Store the file hash
         const hashKey = `hash:${analysisResult.file_name}`;
         await db.put(hashKey, fileHash);
         
         console.log(`Stored file content and hash for: ${analysisResult.file_name}`);
         
-        // Store functions
         for (const func of analysisResult.functions) {
             const functionKey = `function:${path.join(projectRoot, analysisResult.file_name)}:${func.function_name}`;
             await db.put(functionKey, {
@@ -155,7 +182,6 @@ async function storeAnalysisResult(analysisResult, projectRoot, fileHash) {
             });
         }
         
-        // Store imports
         const importKey = `imports:${path.join(projectRoot, analysisResult.file_name)}`;
         await db.put(importKey, analysisResult.imports);
         
@@ -205,7 +231,6 @@ async function getDatabaseContents() {
                 const filePath = key.slice(5);
                 contents.files[filePath] = value;
                 
-                // Build file structure
                 const pathParts = filePath.split('/');
                 let currentLevel = contents.fileStructure;
                 pathParts.forEach((part, index) => {
