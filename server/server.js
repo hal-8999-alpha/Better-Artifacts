@@ -237,6 +237,7 @@ app.post('/api/analyze-modify', async (req, res) => {
   1. An explanation of how the code relates to the query, taking into account the file structure
   2. Any suggested modifications to address the query, ensuring that imports and file paths are correct given the file structure
   3. The updated code for each file that needs changes
+  4. Include the entire code including the import statements
   
   Pay special attention to the functions identified as relevant and the file structure when suggesting imports or calls between files.
   
@@ -332,6 +333,47 @@ app.post('/api/analyze-modify', async (req, res) => {
     }
   });
 
+  app.post('/api/save-api-keys', async (req, res) => {
+    try {
+      const { claudeApiKey, openaiApiKey } = req.body;
+  
+      if (!claudeApiKey && !openaiApiKey) {
+        return res.status(400).json({ error: 'At least one API key must be provided' });
+      }
+  
+      const envPath = path.resolve(__dirname, '../server/.env');
+      let envContent = await fs.readFile(envPath, 'utf8');
+  
+      if (claudeApiKey) {
+        const claudeKeyRegex = /VUE_APP_ANTHROPIC_API_KEY=.*/;
+        if (claudeKeyRegex.test(envContent)) {
+          envContent = envContent.replace(claudeKeyRegex, `VUE_APP_ANTHROPIC_API_KEY=${claudeApiKey}`);
+        } else {
+          envContent += `\nVUE_APP_ANTHROPIC_API_KEY=${claudeApiKey}`;
+        }
+      }
+  
+      if (openaiApiKey) {
+        const openaiKeyRegex = /VUE_APP_OPENAI_API_KEY=.*/;
+        if (openaiKeyRegex.test(envContent)) {
+          envContent = envContent.replace(openaiKeyRegex, `VUE_APP_OPENAI_API_KEY=${openaiApiKey}`);
+        } else {
+          envContent += `\nVUE_APP_OPENAI_API_KEY=${openaiApiKey}`;
+        }
+      }
+  
+      await fs.writeFile(envPath, envContent);
+  
+      // Refresh environment variables
+      require('dotenv').config();
+  
+      res.json({ message: 'API keys saved successfully' });
+    } catch (error) {
+      console.error('Error saving API keys:', error);
+      res.status(500).json({ error: 'Failed to save API keys' });
+    }
+  });
+
 function startServer(port) {
   app.listen(port, () => {
     console.log(`Server running on port ${port}`);
@@ -347,5 +389,12 @@ function startServer(port) {
     }
   });
 }
+
+app.get('/api/get-api-keys', (req, res) => {
+    res.json({
+      claudeApiKey: process.env.VUE_APP_ANTHROPIC_API_KEY || 'No Key',
+      openaiApiKey: process.env.VUE_APP_OPENAI_API_KEY || ''
+    });
+  });
 
 startServer(BASE_PORT);

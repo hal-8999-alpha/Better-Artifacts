@@ -18,7 +18,7 @@ const makeApiCall = async (model, userInput) => {
       };
     } else if (model === 'Claude') {
       const response = await axios.post(`${API_URL}/anthropic`, {
-        system: "Respond with an explanation and python code. For each new Python function, start with SCRIPT_X on a new line (where X is the script number), followed by the function in a Python code block. Only resond with what the user explicitly asks for",
+        system: "Respond with an explanation and python code. For each new Python function, start with SCRIPT_X on a new line (where X is the script number), followed by the function in a Python code block. Only respond with what the user explicitly asks for",
         messages: [
           {
             role: "user",
@@ -98,10 +98,32 @@ const analyzeAndModifyCode = async (query, selectedFiles, databaseContents) => {
   }
 };
 
+const saveApiKeys = async (keys) => {
+  try {
+    const response = await axios.post(`${API_URL}/save-api-keys`, keys);
+    return response.data;
+  } catch (error) {
+    console.error('Error saving API keys:', error);
+    throw error;
+  }
+};
+
+const getApiKeys = async () => {
+  try {
+    const response = await axios.get(`${API_URL}/get-api-keys`);
+    return response.data;
+  } catch (error) {
+    console.error('Error getting API keys:', error);
+    throw error;
+  }
+};
+
 module.exports = {
   makeApiCall,
   startProcess,
   getDatabaseContents,
   selectRelevantFilesAndFunctions,
-  analyzeAndModifyCode
+  analyzeAndModifyCode,
+  saveApiKeys,
+  getApiKeys
 };

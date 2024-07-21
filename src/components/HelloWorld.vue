@@ -14,12 +14,18 @@
         <div class="info-column">Total Tokens: {{ $store.getters.getTotalTokens }}</div>
         <div class="info-column">Estimated Cost: {{ $store.getters.getFormattedCost }}</div>
         <div class="info-column">
+          <button @click="openApiKeyModal" class="icon-button">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"></path>
+            </svg>
+          </button>
           <button @click="copyConversation" class="copy-button">
             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
               <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
             </svg>
           </button>
+          
         </div>
       </div>
       <UserInput @sendMessage="handleSend" />
@@ -69,21 +75,22 @@
         </div>
       </div>
       <CodeDisplay 
-  v-if="!showDatabaseViewer"
-  :codeScripts="codeScripts" 
-  :activeTab="activeTab"
-  @setActiveTab="setActiveTab"
-  @copyCode="copyCode"
-/>
+        v-if="!showDatabaseViewer"
+        :codeScripts="codeScripts" 
+        :activeTab="activeTab"
+        @setActiveTab="setActiveTab"
+        @copyCode="copyCode"
+      />
       <transition name="modal">
-      <div v-if="showDatabaseViewer" class="modal-overlay">
-        <div class="modal-content">
-          <button @click="toggleDatabaseViewer" class="close-button">&times;</button>
-          <DatabaseViewer />
+        <div v-if="showDatabaseViewer" class="modal-overlay">
+          <div class="modal-content">
+            <button @click="toggleDatabaseViewer" class="close-button">&times;</button>
+            <DatabaseViewer />
+          </div>
         </div>
-      </div>
-    </transition>
+      </transition>
     </div>
+    <ApiKeyModal :show="showApiKeyModal" @close="closeApiKeyModal" />
   </div>
 </template>
 
@@ -97,9 +104,13 @@ import UserInput from './UserInput.vue';
 import CodeDisplay from './CodeDisplay.vue';
 import DatabaseViewer from './DatabaseViewer.vue';
 import { readFileAsText } from '../utils/fileUtils';
+import ApiKeyModal from './ApiKeyModal.vue';
+
+
 
 const store = useStore();
 
+const showApiKeyModal = ref(false);
 const codeScripts = ref([]);
 const activeTab = ref(0);
 const models = ['Claude', 'GPT4o'];
@@ -118,6 +129,14 @@ const conversationTabs = ref([
 ]);
 const activeTabIndex = ref(0);
 
+const openApiKeyModal = () => {
+  showApiKeyModal.value = true;
+};
+
+const closeApiKeyModal = () => {
+  showApiKeyModal.value = false;
+};
+
 const activeConversation = computed(() => conversationTabs.value[activeTabIndex.value].conversation);
 
 const databaseContents = ref(null);
@@ -130,6 +149,9 @@ const handleModelChange = () => {
 const handleModeChange = () => {
   console.log(`Mode changed to: ${selectedMode.value}`);
 };
+
+
+
 
 const openDirectoryDialog = async () => {
   try {
@@ -148,6 +170,9 @@ const openDirectoryDialog = async () => {
         handle: directoryHandle,
         files: files 
       };
+
+      // Automatically trigger the update process
+      await handleUpdate();
     } else {
       alert("Your browser doesn't support directory selection. Please use a modern browser.");
     }
@@ -180,7 +205,7 @@ const handleUpdate = async () => {
     return;
   }
 
-  console.log('Update button clicked');
+  console.log('Update process started');
   isUpdating.value = true;
   
   try {
@@ -221,6 +246,7 @@ const handleUpdate = async () => {
     isUpdating.value = false;
   }
 };
+
 const formatDate = (date) => {
   const options = {
     year: 'numeric',
@@ -393,8 +419,7 @@ onMounted(async () => {
   font-family: 'Arial', sans-serif;
   background-color: #000000;
   color: #cccccc;
-  overflow: hidden;
-}
+  overflow: hidden;}
 
 .left-column, .right-column {
   display: flex;
@@ -474,11 +499,13 @@ onMounted(async () => {
 .last-update-time {
   font-size: 0.9rem;
   color: #cccccc;
+  text-align: left;
 }
 
 .update-button {
   height: 36px;
   border-radius: 20px;
+  margin-left: 15px;
   background-color: #8e44ad;
   color: white;
   border: none;
@@ -627,4 +654,25 @@ select:focus {
   opacity: 0;
 }
 
+.button-group {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
+.icon-button {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #cccccc;
+  padding: 0.25rem;
+  display: flex;
+  align-items: center;
+  margin-right: 10px;
+  justify-content: center;
+}
+
+.icon-button:hover {
+  color: #ffffff;
+}
 </style>
