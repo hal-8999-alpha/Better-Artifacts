@@ -17,6 +17,7 @@
     "multer": "^1.4.5-lts.1",
     "neo4j-driver": "^5.22.0",
     "openai": "^4.52.7",
+    "p-limit": "^6.1.0",
     "vue": "^3.2.13",
     "vue-router": "^4.0.3",
     "vuex": "^4.0.0"

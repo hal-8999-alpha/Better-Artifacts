@@ -2,6 +2,7 @@ const fs = require('fs').promises;
 const path = require('path');
 const { Level } = require('level');
 const customGPT = require('./customGPT');
+const crypto = require('crypto'); // Add this line to import the crypto module
 
 let db;
 
@@ -19,23 +20,36 @@ async function closeDatabase() {
     }
 }
 
+// New function to calculate file hash
+async function calculateFileHash(filePath) {
+    const fileBuffer = await fs.readFile(filePath);
+    const hashSum = crypto.createHash('sha256');
+    hashSum.update(fileBuffer);
+    return hashSum.digest('hex');
+}
+
 async function startProcess(files, projectRoot) {
     console.log(`Starting process for ${files.length} files`);
     try {
         await openDatabase();
         console.log('Database initialized');
 
-        await clearDatabase();
-        console.log('Database cleared');
-
         for (const file of files) {
             console.log(`Processing file: ${file.relativePath}`);
             const fileContent = await readFile(file.absolutePath);
 
             if (fileContent !== null) {
-                const analysisResult = await analyzeFile(file.relativePath, fileContent);
-                await storeAnalysisResult(analysisResult, projectRoot);
-                console.log(`Completed processing and storing file: ${file.relativePath}`);
+                const currentHash = await calculateFileHash(file.absolutePath);
+                const storedHash = await getStoredHash(file.relativePath);
+
+                if (currentHash !== storedHash) {
+                    console.log(`File ${file.relativePath} has changed, processing...`);
+                    const analysisResult = await analyzeFile(file.relativePath, fileContent);
+                    await storeAnalysisResult(analysisResult, projectRoot, currentHash);
+                    console.log(`Completed processing and storing file: ${file.relativePath}`);
+                } else {
+                    console.log(`File ${file.relativePath} unchanged, skipping...`);
+                }
             } else {
                 console.log(`Skipped file: ${file.relativePath} due to read error`);
             }
@@ -52,6 +66,19 @@ async function startProcess(files, projectRoot) {
     } finally {
         await closeDatabase();
         console.log('Database closed');
+    }
+}
+
+// New function to get stored hash
+async function getStoredHash(relativePath) {
+    try {
+        const key = `hash:${relativePath}`;
+        return await db.get(key);
+    } catch (error) {
+        if (error.notFound) {
+            return null;
+        }
+        throw error;
     }
 }
 
@@ -104,7 +131,7 @@ async function readFile(filePath) {
     }
 }
 
-async function storeAnalysisResult(analysisResult, projectRoot) {
+async function storeAnalysisResult(analysisResult, projectRoot, fileHash) {
     console.log(`Storing analysis result for file: ${analysisResult.file_name}`);
     try {
         const key = `file:${path.join(projectRoot, analysisResult.file_name)}`;
@@ -113,7 +140,11 @@ async function storeAnalysisResult(analysisResult, projectRoot) {
             content: analysisResult.content
         });
         
-        console.log(`Stored file content (first 100 chars): ${analysisResult.content.substring(0, 100)}`);
+        // Store the file hash
+        const hashKey = `hash:${analysisResult.file_name}`;
+        await db.put(hashKey, fileHash);
+        
+        console.log(`Stored file content and hash for: ${analysisResult.file_name}`);
         
         // Store functions
         for (const func of analysisResult.functions) {

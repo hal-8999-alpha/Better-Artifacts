@@ -9,3 +9,4 @@ def say_yo():
     print('CHANGED')
     say_blah()  # Added second call to say_blah()
     say_goodbye()
+    say_goodbye()

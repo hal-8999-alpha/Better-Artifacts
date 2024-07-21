@@ -204,58 +204,58 @@ app.post('/api/anthropic', async (req, res) => {
   });
   
   app.post('/api/start-process', upload.array('files'), async (req, res) => {
-      console.log('Received start-process request');
-      try {
-          if (!req.files || req.files.length === 0) {
-              console.error('No files were uploaded');
-              return res.status(400).json({ error: 'No files were uploaded' });
-          }
-  
-          const rootDirectory = req.body.rootDirectory;
-          const projectRoot = path.join(process.cwd(), 'projects', rootDirectory);
-  
-          // Ensure the project root directory exists
-          await fs.mkdir(projectRoot, { recursive: true });
-  
-          // Get the file paths from the request body
-          const filePaths = req.body.filePaths;
-          if (!Array.isArray(filePaths)) {
-              filePaths = [filePaths];
-          }
-  
-          // First, create all necessary directories
-          for (const filePath of filePaths) {
-              const absolutePath = path.join(projectRoot, filePath);
-              await fs.mkdir(path.dirname(absolutePath), { recursive: true });
-          }
-  
-          // Now, move all files
-          const files = await Promise.all(req.files.map(async (file, index) => {
-              const relativePath = filePaths[index];
-              const absolutePath = path.join(projectRoot, relativePath);
-              
-              // Move the file to its correct location
-              await fs.rename(file.path, absolutePath);
-  
-              console.log(`File moved to: ${absolutePath}`);
-  
-              return { relativePath, absolutePath };
-          }));
-  
-          console.log('Files processed:', files);
-  
-          const result = await codebaseManager.startProcess(files, projectRoot);
-          console.log('Process result:', result);
-          
-          res.status(200).json({ 
-              message: result ? 'Process completed successfully' : 'Process failed',
-              success: result
-          });
-      } catch (error) {
-          console.error('Process Error:', error);
-          res.status(500).json({ error: error.message });
-      }
-  });
+    console.log('Received start-process request');
+    try {
+        if (!req.files || req.files.length === 0) {
+            console.error('No files were uploaded');
+            return res.status(400).json({ error: 'No files were uploaded' });
+        }
+
+        const rootDirectory = req.body.rootDirectory;
+        const projectRoot = path.join(process.cwd(), 'projects', rootDirectory);
+
+        // Ensure the project root directory exists
+        await fs.mkdir(projectRoot, { recursive: true });
+
+        // Get the file paths from the request body
+        const filePaths = req.body.filePaths;
+        if (!Array.isArray(filePaths)) {
+            filePaths = [filePaths];
+        }
+
+        // First, create all necessary directories
+        for (const filePath of filePaths) {
+            const absolutePath = path.join(projectRoot, filePath);
+            await fs.mkdir(path.dirname(absolutePath), { recursive: true });
+        }
+
+        // Now, move all files
+        const files = await Promise.all(req.files.map(async (file, index) => {
+            const relativePath = filePaths[index];
+            const absolutePath = path.join(projectRoot, relativePath);
+            
+            // Move the file to its correct location
+            await fs.rename(file.path, absolutePath);
+
+            console.log(`File moved to: ${absolutePath}`);
+
+            return { relativePath, absolutePath };
+        }));
+
+        console.log('Files processed:', files);
+
+        const result = await codebaseManager.startProcess(files, projectRoot);
+        console.log('Process result:', result);
+        
+        res.status(200).json({ 
+            message: result ? 'Process completed successfully' : 'Process failed',
+            success: result
+        });
+    } catch (error) {
+        console.error('Process Error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
   
   app.get('/api/database-contents', async (req, res) => {
     try {
