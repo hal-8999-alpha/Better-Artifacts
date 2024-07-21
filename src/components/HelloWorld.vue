@@ -75,12 +75,12 @@
         </div>
       </div>
       <CodeDisplay 
-        v-if="!showDatabaseViewer"
-        :codeScripts="codeScripts" 
-        :activeTab="activeTab"
-        @setActiveTab="setActiveTab"
-        @copyCode="copyCode"
-      />
+    :codeScripts="codeScripts" 
+    :activeTab="activeTab"
+    :fileNames="scriptFileNames"
+    @setActiveTab="setActiveTab"
+    @copyCode="copyCode"
+  />
       <transition name="modal">
         <div v-if="showDatabaseViewer" class="modal-overlay">
           <div class="modal-content">
@@ -354,6 +354,30 @@ const handleProjectMode = async (message) => {
     
     analysisResult.value = result;
 
+    // Helper function to get the file name from a path
+    const getFileName = (filePath) => {
+      const parts = filePath.split(/[\/\\]/);
+      return parts[parts.length - 1];
+    };
+
+    // Update codeScripts and scriptFileNames
+    codeScripts.value = result.modifications.flatMap(mod => 
+      mod.scripts.map(script => {
+        let contentStr = Array.isArray(script.content) ? script.content[0] : script.content;
+        contentStr = contentStr.replace(/^SCRIPT_\d+\n/, '').replace(/^python\n/, '');
+        return `# File: ${getFileName(mod.fileName)}\n${contentStr.trim()}`;
+      })
+    );
+    
+    // Make sure scriptFileNames is defined as a ref
+    if (!scriptFileNames) {
+      scriptFileNames = ref([]);
+    }
+    scriptFileNames.value = result.modifications.map(mod => getFileName(mod.fileName));
+
+    // Reset activeTab to show the first script
+    activeTab.value = 0;
+
     // Format the response
     const formattedResponse = `
 Analysis complete. Here's a summary of the changes:
@@ -363,7 +387,7 @@ ${result.explanation}
 
 Modifications:
 ${result.modifications.map(mod => `
-File: ${mod.fileName.split('\\').pop()}
+File: ${getFileName(mod.fileName)}
 Changes: ${mod.changes}
 `).join('\n')}
 
@@ -373,13 +397,8 @@ To see the updated code, please check the code display panel.
     return { 
       role: 'assistant', 
       content: formattedResponse,
-      codeScripts: result.modifications.flatMap(mod => 
-        mod.scripts.map(script => {
-          let contentStr = Array.isArray(script.content) ? script.content.join('\n') : script.content;
-          contentStr = contentStr.replace(/^SCRIPT_\d+\n/, '').replace(/^python\n/, '');
-          return contentStr.trim();
-        })
-      )
+      codeScripts: codeScripts.value,
+      usage: result.usage // Assuming the result includes usage information
     };
   } catch (error) {
     console.error('Error in handleProjectMode:', error);

@@ -12,13 +12,13 @@
       </div>
       <div class="tabs" v-if="codeScripts.length > 0">
         <div 
-          v-for="(tab, index) in codeScripts" 
+          v-for="(script, index) in codeScripts" 
           :key="index" 
           class="tab" 
           :class="{ 'active': activeTab === index }"
           @click="$emit('setActiveTab', index)"
         >
-          {{ index + 1 }}
+          {{ getFileName(script) }}
         </div>
       </div>
     </div>
@@ -27,7 +27,21 @@
   <script setup>
   import { computed } from 'vue';
   
-  const props = defineProps(['codeScripts', 'activeTab']);
+  const props = defineProps({
+    codeScripts: {
+      type: Array,
+      required: true
+    },
+    activeTab: {
+      type: Number,
+      required: true
+    },
+    fileNames: {
+      type: Array,
+      default: () => []
+    }
+  });
+  
   defineEmits(['setActiveTab', 'copyCode']);
   
   const currentScriptContent = computed(() => {
@@ -35,6 +49,22 @@
     const content = props.codeScripts[props.activeTab];
     return content;
   });
+  
+  const getFileName = (script) => {
+    // Check if we have a corresponding file name for this script
+    if (props.fileNames[props.codeScripts.indexOf(script)]) {
+      return props.fileNames[props.codeScripts.indexOf(script)];
+    }
+    
+    // If no file name is provided, try to extract it from the script content
+    const firstLine = script.split('\n')[0];
+    if (firstLine.startsWith('# File:')) {
+      return firstLine.substring(7).trim();
+    }
+    
+    // If we can't find a file name, return a default
+    return `Script ${props.codeScripts.indexOf(script) + 1}`;
+  };
   </script>
   
   <style scoped>
@@ -103,7 +133,7 @@
   .tab {
     flex: 0 0 auto;
     min-width: 50px;
-    max-width: 120px;
+    max-width: 200px;
     display: flex;
     justify-content: center;
     align-items: center;
@@ -113,6 +143,9 @@
     transition: all 0.3s ease;
     font-size: 0.9rem;
     padding: 0 15px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
   
   .tab:hover, .tab.active {
