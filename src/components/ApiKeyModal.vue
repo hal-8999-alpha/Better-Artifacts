@@ -5,6 +5,7 @@
           <button @click="closeModal" class="close-button">&times;</button>
           <h2>API Keys</h2>
           <div v-if="error" class="error-message">{{ error }}</div>
+          <div v-if="success" class="success-message">{{ success }}</div>
           <div class="input-group">
             <label for="claude-api-key">Claude API Key:</label>
             <div class="input-with-toggle">
@@ -54,6 +55,7 @@
   const showClaudeKey = ref(false);
   const showOpenAIKey = ref(false);
   const error = ref('');
+  const success = ref('');
   
   const closeModal = () => {
     emit('close');
@@ -73,11 +75,12 @@
         claudeApiKey: claudeApiKey.value,
         openaiApiKey: openaiApiKey.value
       });
-      alert('API keys saved successfully!');
-      closeModal();
+      success.value = 'API keys saved successfully!';
+      error.value = '';
     } catch (err) {
       console.error('Error saving API keys:', err);
       error.value = 'Failed to save API keys. Please try again.';
+      success.value = '';
     }
   };
   
@@ -87,9 +90,11 @@
       claudeApiKey.value = keys.claudeApiKey;
       openaiApiKey.value = keys.openaiApiKey;
       error.value = '';
+      success.value = '';
     } catch (err) {
       console.error('Error loading API keys:', err);
       error.value = 'Failed to load API keys. Please try again.';
+      success.value = '';
     }
   };
   
@@ -199,6 +204,11 @@
   
   .error-message {
     color: #ff6b6b;
+    margin-bottom: 1rem;
+  }
+  
+  .success-message {
+    color: #4CAF50;
     margin-bottom: 1rem;
   }
   </style>

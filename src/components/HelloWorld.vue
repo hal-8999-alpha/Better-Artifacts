@@ -9,7 +9,7 @@
         @removeTab="removeTab"
         @updateTabName="updateTabName"
       />
-      <Conversation :conversation="activeConversation" />
+      <Conversation :conversation="activeConversation" @clear="clearConversation" />
       <div class="info-row">
         <div class="info-column">Total Tokens: {{ $store.getters.getTotalTokens }}</div>
         <div class="info-column">Estimated Cost: {{ $store.getters.getFormattedCost }}</div>
@@ -180,6 +180,12 @@ const openDirectoryDialog = async () => {
     console.error('Error selecting directory:', error);
     selectedDirectory.value = null;
     selectedDirectoryName.value = '';
+  }
+};
+
+const clearConversation = () => {
+  if (activeTabIndex.value >= 0 && activeTabIndex.value < conversationTabs.value.length) {
+    conversationTabs.value[activeTabIndex.value].conversation = [];
   }
 };
 
