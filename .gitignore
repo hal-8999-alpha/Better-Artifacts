@@ -4,7 +4,10 @@ node_modules
 /server/.env
 /server/projects
 /server/codebase-db
-
+server/projects
+server/uploads
+server/codebase-db
+server/.env
 
 # local env files
 .env.local
