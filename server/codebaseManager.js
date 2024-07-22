@@ -79,30 +79,39 @@ async function calculateFileHash(filePath) {
 
 async function processFile(file, projectRoot) {
     console.log(`Processing file: ${file.relativePath}`);
-    const fileContent = await readFile(file.absolutePath);
+    try {
+        const fileContent = await readFile(file.absolutePath);
 
-    if (fileContent !== null) {
-        const currentHash = await calculateFileHash(file.absolutePath);
-        const storedHash = await getStoredHash(file.relativePath);
+        if (fileContent !== null) {
+            const currentHash = await calculateFileHash(file.absolutePath);
+            const storedHash = await getStoredHash(file.relativePath);
 
-        console.log(`File: ${file.relativePath}`);
-        console.log(`Current hash: ${currentHash}`);
-        console.log(`Stored hash: ${storedHash}`);
+            console.log(`File: ${file.relativePath}`);
+            console.log(`Current hash: ${currentHash}`);
+            console.log(`Stored hash: ${storedHash}`);
 
-        if (currentHash !== storedHash) {
-            console.log(`File ${file.relativePath} has changed, processing...`);
-            try {
-                const analysisResult = await analyzeFile(file.relativePath, fileContent);
-                await storeAnalysisResult(analysisResult, projectRoot, currentHash);
-                console.log(`Completed processing and storing file: ${file.relativePath}`);
-            } catch (analysisError) {
-                console.error(`Error analyzing file ${file.relativePath}:`, analysisError);
+            if (currentHash !== storedHash) {
+                console.log(`File ${file.relativePath} has changed, processing...`);
+                try {
+                    const analysisResult = await customGPT.analyzeFile(fileContent, file.relativePath);
+                    await storeAnalysisResult(analysisResult, projectRoot, currentHash);
+                    console.log(`Completed processing and storing file: ${file.relativePath}`);
+                    return { success: true, file: file.relativePath, usage: analysisResult.usage, processed: true };
+                } catch (analysisError) {
+                    console.error(`Error analyzing file ${file.relativePath}:`, analysisError);
+                    return { success: false, file: file.relativePath, error: analysisError.message, processed: true };
+                }
+            } else {
+                console.log(`File ${file.relativePath} unchanged, skipping...`);
+                return { success: true, file: file.relativePath, skipped: true, processed: false };
             }
         } else {
-            console.log(`File ${file.relativePath} unchanged, skipping...`);
+            console.log(`Skipped file: ${file.relativePath} due to read error`);
+            return { success: false, file: file.relativePath, error: 'Read error', processed: false };
         }
-    } else {
-        console.log(`Skipped file: ${file.relativePath} due to read error`);
+    } catch (error) {
+        console.error(`Error processing file ${file.relativePath}:`, error);
+        return { success: false, file: file.relativePath, error: error.message, processed: false };
     }
 }
 
@@ -115,42 +124,45 @@ async function startProcess(files, projectRoot, ignoredPaths) {
         console.log('Database initialized');
 
         const { default: PQueue } = await import('p-queue');
-        const queue = new PQueue({concurrency: 50}); // Adjust concurrency as needed
+        const queue = new PQueue({concurrency: 5});
 
-        const processFileWithRateLimit = async (file) => {
-            // Check if we need to reset rate limit tracking
-            if (Date.now() - lastResetTime >= 60000) {
-                resetRateLimitTracking();
-            }
-
-            // Check if we're within rate limits
-            if (requestsThisMinute >= RPM_LIMIT || tokensThisMinute >= TPM_LIMIT) {
-                const delay = 60000 - (Date.now() - lastResetTime);
-                await new Promise(resolve => setTimeout(resolve, delay));
-                resetRateLimitTracking();
-            }
-
-            // Process the file
-            await processFile(file, projectRoot);
-
-            // Update rate limit tracking
-            requestsThisMinute++;
-            // Estimate token usage (you may need to adjust this based on your actual usage)
-            tokensThisMinute += file.relativePath.length * 2; // Rough estimate
-        };
-
-        // Queue all file processing tasks
-        await Promise.all(files.map(file => queue.add(() => processFileWithRateLimit(file))));
+        const results = await Promise.all(files.map(file => queue.add(() => processFile(file, projectRoot))));
 
         console.log('Generating function call tree...');
         const tree = await generateFunctionCallTree(projectRoot);
         await db.put('functionCallTree', tree);
 
-        console.log('Process completed successfully');
-        return true;
+        const successCount = results.filter(r => r.success && r.processed).length;
+        const failureCount = results.filter(r => !r.success && r.processed).length;
+        const skippedCount = results.filter(r => r.skipped).length;
+
+        console.log(`Process completed. Successful: ${successCount}, Failed: ${failureCount}, Skipped: ${skippedCount}`);
+        
+        // Calculate total usage only for processed files
+        const totalUsage = results.reduce((acc, result) => {
+            if (result.processed && result.usage) {
+                acc.prompt_tokens += result.usage.prompt_tokens || 0;
+                acc.completion_tokens += result.usage.completion_tokens || 0;
+                acc.total_tokens += result.usage.total_tokens || 0;
+            }
+            return acc;
+        }, { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 });
+
+        console.log('Total usage:', totalUsage);
+
+        return {
+            success: failureCount === 0,
+            results: results,
+            usage: totalUsage,
+            processedCount: successCount + failureCount,
+            skippedCount: skippedCount
+        };
     } catch (error) {
         console.error('Error in startProcess:', error);
-        return false;
+        return {
+            success: false,
+            error: error.message
+        };
     } finally {
         await closeDatabase();
     }

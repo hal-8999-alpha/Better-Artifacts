@@ -237,13 +237,26 @@ const handleUpdate = async () => {
     console.log('Sending files:', selectedDirectory.value.files.map(f => f.path));
 
     const result = await startProcess(formData);
+    console.log('startProcess result:', result);  // Add this line for debugging
+
     if (result.success) {
-      console.log(result.message);
+      console.log('Process completed successfully');
       lastUpdateTime.value = formatDate(new Date());
       await fetchDatabaseContents();
+      
+      // Update token count only if files were processed
+      if (result.processedCount > 0) {
+        store.dispatch('updateTokensAndCost', {
+          usage: result.usage,
+          isAssistantAPI: true
+        });
+      }
+      
+      console.log(`Updated token count - Input: ${result.usage.prompt_tokens}, Output: ${result.usage.completion_tokens}`);
+      console.log(`Files processed: ${result.processedCount}, Files skipped: ${result.skippedCount}`);
     } else {
-      console.error(result.message);
-      throw new Error(result.message);
+      console.error('Process failed:', result.error);
+      throw new Error(result.error);
     }
   } catch (error) {
     console.error('Error during update:', error);
@@ -310,11 +323,12 @@ const handleSend = async (message) => {
       activeTab.value = 0;
     }
 
-    // Update token count and cost (you may need to adjust this based on the actual response structure)
+    // Update token count and cost
     if (response.usage) {
       store.dispatch('updateTokensAndCost', {
-        inputTokens: response.usage.input_tokens,
-        outputTokens: response.usage.output_tokens
+        inputTokens: response.usage.prompt_tokens || response.usage.input_tokens || 0,
+        outputTokens: response.usage.completion_tokens || response.usage.output_tokens || 0,
+        isAssistantAPI: selectedMode.value === 'Project'
       });
     }
 
@@ -344,6 +358,17 @@ const handleProjectMode = async (message) => {
     const relevantFiles = await selectRelevantFilesAndFunctions(message, databaseContents.value);
     console.log('Relevant files:', relevantFiles);
 
+    // Update token count for file selection (Assistant API)
+    if (relevantFiles.usage) {
+      store.dispatch('updateTokensAndCost', {
+        usage: {
+          prompt_tokens: relevantFiles.usage.prompt_tokens,
+          completion_tokens: relevantFiles.usage.completion_tokens
+        },
+        isAssistantAPI: true
+      });
+    }
+
     // Second stage: Analyze and modify code
     const result = await analyzeAndModifyCode(message, relevantFiles.relevantFiles, databaseContents.value);
     console.log('Analysis result:', result);
@@ -353,6 +378,17 @@ const handleProjectMode = async (message) => {
     }
     
     analysisResult.value = result;
+
+    // Update token count for code analysis (Claude API)
+    if (result.usage) {
+      store.dispatch('updateTokensAndCost', {
+        usage: {
+          prompt_tokens: result.usage.input_tokens,
+          completion_tokens: result.usage.output_tokens
+        },
+        isAssistantAPI: false
+      });
+    }
 
     // Helper function to get the file name from a path
     const getFileName = (filePath) => {
@@ -394,7 +430,6 @@ To see the updated code, please check the code display panel.
       role: 'assistant', 
       content: formattedResponse,
       codeScripts: codeScripts.value,
-      usage: result.usage // Assuming the result includes usage information
     };
   } catch (error) {
     console.error('Error in handleProjectMode:', error);
@@ -405,9 +440,10 @@ To see the updated code, please check the code display panel.
   }
 };
 
+
 const handleChatMode = async (message) => {
   const response = await makeApiCall(selectedMode.value, selectedModel.value, message);
-  console.log('Chat mode response:', response); // Add this line for debugging
+  console.log('Chat mode response:', response);
   return {
     role: 'assistant',
     content: response.conversation || response.content || "No response content",

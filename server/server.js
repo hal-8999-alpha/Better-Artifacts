@@ -16,7 +16,7 @@ setupEnvFile().then(() => {
 
   const app = express();
   app.use(cors());
-  app.use(express.json());
+  app.use(express.json({ limit: '100mb' }));
 
   const storage = multer.diskStorage({
       destination: function (req, file, cb) {
@@ -26,6 +26,44 @@ setupEnvFile().then(() => {
         cb(null, file.fieldname + '-' + Date.now() + path.extname(file.originalname))
       }
   });
+
+  // Add or replace the existing safeJSONParse function with this improved version
+const safeJSONParse = (str) => {
+  // First, try parsing the string as-is
+  try {
+    return JSON.parse(str);
+  } catch (e) {
+    console.log("Initial parse failed, attempting to fix the JSON string");
+  }
+
+  // If parsing fails, try to fix common issues
+  let fixedStr = str;
+
+  // Replace escaped newlines with actual newlines
+  fixedStr = fixedStr.replace(/\\n/g, '\n');
+
+  // Replace escaped quotes with single quotes
+  fixedStr = fixedStr.replace(/\\"/g, "'");
+
+  // Remove any remaining backslashes before quotes
+  fixedStr = fixedStr.replace(/\\/g, '');
+
+  // Wrap property names in double quotes
+  fixedStr = fixedStr.replace(/(\w+):/g, '"$1":');
+
+  // Try parsing again
+  try {
+    return JSON.parse(fixedStr);
+  } catch (e) {
+    console.error("Failed to parse JSON even after fixing:", e);
+    throw new Error("Invalid JSON structure");
+  }
+};
+
+// Usage example:
+// const result = safeJSONParse(response.conversation);
+
+
 
   const upload = multer({ dest: 'uploads/' });
 
@@ -326,8 +364,12 @@ setupEnvFile().then(() => {
         console.log('codebaseManager.startProcess result:', result);
         
         res.status(200).json({ 
-          message: result ? 'Process completed successfully' : 'Process failed',
-          success: result
+          success: result.success,
+          processedCount: result.processedCount,
+          skippedCount: result.skippedCount,
+          usage: result.usage,
+          results: result.results,
+          error: result.error
         });
     
       } catch (error) {
@@ -358,177 +400,193 @@ setupEnvFile().then(() => {
     
     app.post('/api/select-files', async (req, res) => {
       try {
+        console.log('Received request for select-files');
         const { query, databaseContents } = req.body;
+        
+        if (!query || !databaseContents) {
+          console.error('Missing required fields in request body');
+          return res.status(400).json({ error: 'Missing required fields in request body' });
+        }
+    
+        console.log('Query:', query);
+        console.log('Database Contents Keys:', Object.keys(databaseContents));
+    
         const result = await customGPT.selectRelevantFiles(query, databaseContents);
         
         if (!result.relevantFiles || result.relevantFiles.length === 0) {
+          console.log('No relevant files found for the given query');
           return res.status(400).json({ error: 'No relevant files found for the given query.' });
         }
         
-        res.json(result);
+        console.log('Relevant files selected:', result.relevantFiles);
+        console.log('Usage:', result.usage);
+    
+        res.json({
+          relevantFiles: result.relevantFiles,
+          explanation: result.explanation,
+          usage: result.usage
+        });
       } catch (error) {
         console.error('Error in file selection:', error);
         res.status(500).json({ error: 'Error in file selection process' });
       }
     });
     
-    app.post('/api/analyze-modify', async (req, res) => {
-        try {
-          console.log('Received request for analyze-modify');
-          const { query, selectedFiles, databaseContents } = req.body;
-          
-          if (!query || !selectedFiles || !databaseContents) {
-            console.error('Missing required fields in request body');
-            return res.status(400).json({ error: 'Missing required fields in request body' });
-          }
-        
-          console.log('Query:', query);
-          console.log('Selected Files:', JSON.stringify(selectedFiles, null, 2));
-          console.log('Database Contents Keys:', Object.keys(databaseContents));
-        
-          console.log('Processing relevant files');
-          const relevantFilesContent = selectedFiles.map(file => {
-            // Find the matching file in the database contents
-            const fileEntry = Object.entries(databaseContents.files).find(([path, data]) => data.file_name === file.fileName);
-            
-            if (!fileEntry) {
-              console.error(`File data not found for ${file.fileName}`);
-              return null;
-            }
-            
-            const [filePath, fileData] = fileEntry;
-            return {
-              fileName: file.fileName,
-              filePath: filePath,
-              content: fileData.content,
-              summary: fileData.file_summary,
-              functions: (fileData.functions || []).filter(f => file.relevantFunctions.includes(f.function_name))
-            };
-          }).filter(Boolean);
-        
-          if (relevantFilesContent.length === 0) {
-            console.error('No relevant file data found');
-            return res.status(400).json({ error: 'No relevant file data found' });
-          }
-        
-          console.log('Relevant files content:', JSON.stringify(relevantFilesContent, null, 2));
-        
-          console.log('Preparing prompt for API call');
-          const prompt = `Given the following relevant files and their contents:
-      ${relevantFilesContent.map(file => `
-      File: ${file.fileName}
-      Content:
-      ${file.content}
+    // Add this function near the top of your server.js file, after your imports
+
+
+// Replace your entire /api/analyze-modify endpoint with this code
+app.post('/api/analyze-modify', async (req, res) => {
+  try {
+    console.log('Received request for analyze-modify');
+    const { query, selectedFiles, databaseContents } = req.body;
+    
+    if (!query || !selectedFiles || !databaseContents) {
+      console.error('Missing required fields in request body');
+      return res.status(400).json({ error: 'Missing required fields in request body' });
+    }
+
+    console.log('Query:', query);
+    console.log('Selected Files:', JSON.stringify(selectedFiles, null, 2));
+    console.log('Database Contents Keys:', Object.keys(databaseContents));
+
+    console.log('Processing relevant files');
+    const relevantFilesContent = selectedFiles.map(file => {
+      // Find the matching file in the database contents
+      const fileEntry = Object.entries(databaseContents.files).find(([path, data]) => data.file_name === file.fileName);
       
-      Summary: ${file.summary}
+      if (!fileEntry) {
+        console.error(`File data not found for ${file.fileName}`);
+        return null;
+      }
       
-      Relevant Functions:
-      ${file.functions.map(f => `- ${f.function_name}: ${f.summary}`).join('\n')}`).join('\n')}
-      
-      And the following file structure:
-      ${JSON.stringify(databaseContents.fileStructure, null, 2)}
-      
-      And the user query: "${query}"
-      
-      Please analyze the code and provide:
-      1. An explanation of how the code relates to the query, taking into account the file structure
-      2. Any suggested modifications to address the query, ensuring that imports and file paths are correct given the file structure
-      3. The updated code for each file that needs changes
-      4. Include the entire code including the import statements
-      
-      Pay special attention to the functions identified as relevant and the file structure when suggesting imports or calls between files.
-      
-      For each new or modified Python function, start with SCRIPT_X on a new line (where X is the script number), followed by the function in a Python code block. Only respond with what the user explicitly asks for.
-      
-      Return your response as a JSON object with the following structure:
-      {
-        "explanation": "Your explanation here",
-        "modifications": [
-          {
-            "fileName": "path/to/example.py",
-            "changes": "A description of the changes made",
-            "scripts": [
-              {
-                "name": "function_name",
-                "content": "The full content of the function"
-              }
-            ]
-          }
-        ]
-      }`;
-      
-          console.log('Full prompt being sent to the analyzing LLM:');
-          console.log(prompt);
-        
-          console.log('Making API call');
-          const response = await makeApiCall('Project', 'Claude', prompt);
-          console.log('Received response from API:', JSON.stringify(response, null, 2));
-        
-          if (!response) {
-            console.error('No response received from API');
-            return res.status(500).json({ error: 'No response received from API service' });
-          }
-        
-          if (typeof response !== 'object' || !response.conversation) {
-            console.error('Unexpected API response structure:', response);
-            return res.status(500).json({ error: 'Unexpected response structure from API service' });
-          }
-        
-          let result;
-          try {
-            result = JSON.parse(response.conversation);
-            console.log('Parsed result:', JSON.stringify(result, null, 2));
-          } catch (parseError) {
-            console.error('Error parsing API response:', parseError);
-            return res.status(500).json({ error: 'Invalid response from API service' });
-          }
-        
-          if (!result || !result.explanation || !Array.isArray(result.modifications)) {
-            console.error('Unexpected response structure after parsing:', result);
-            return res.status(500).json({ error: 'Unexpected response structure from API service' });
-          }
-        
-          console.log('Processing modifications');
-          const safeModifications = result.modifications.map(mod => {
-            if (!mod) {
-              console.error('Encountered null or undefined modification');
-              return null;
-            }
-            return {
-              fileName: mod.fileName || 'Unknown File',
-              changes: mod.changes || 'No changes described',
-              scripts: Array.isArray(mod.scripts) ? mod.scripts.map(script => {
-                if (!script) {
-                  console.error('Encountered null or undefined script');
-                  return null;
-                }
-                // Split the content by SCRIPT_X markers
-                const scriptParts = script.content.split(/SCRIPT_\d+\n/);
-                // Remove any empty strings from the array
-                const cleanScripts = scriptParts.filter(part => part.trim() !== '');
-                return {
-                  name: script.name || 'Unnamed Script',
-                  content: cleanScripts
-                };
-              }).filter(Boolean) : []
-            };
-          }).filter(Boolean);
-      
-          console.log('Final response:', JSON.stringify({
-            explanation: result.explanation,
-            modifications: safeModifications
-          }, null, 2));
-      
-          console.log('Sending response');
-          res.json({
-            explanation: result.explanation,
-            modifications: safeModifications
-          });
-        } catch (error) {
-          console.error('Error in code analysis and modification:', error);
-          res.status(500).json({ error: 'Error in code analysis and modification process' });
+      const [filePath, fileData] = fileEntry;
+      return {
+        fileName: file.fileName,
+        filePath: filePath,
+        content: fileData.content,
+        summary: fileData.file_summary,
+        functions: (fileData.functions || []).filter(f => file.relevantFunctions.includes(f.function_name))
+      };
+    }).filter(Boolean);
+
+    if (relevantFilesContent.length === 0) {
+      console.error('No relevant file data found');
+      return res.status(400).json({ error: 'No relevant file data found' });
+    }
+
+    console.log('Relevant files content:', JSON.stringify(relevantFilesContent, null, 2));
+
+    console.log('Preparing prompt for API call');
+    const prompt = `Given the following relevant files and their contents:
+${relevantFilesContent.map(file => `
+File: ${file.fileName}
+Content:
+${file.content}
+
+Summary: ${file.summary}
+
+Relevant Functions:
+${file.functions.map(f => `- ${f.function_name}: ${f.summary}`).join('\n')}`).join('\n')}
+
+And the following file structure:
+${JSON.stringify(databaseContents.fileStructure, null, 2)}
+
+And the user query: "${query}"
+
+Please analyze the code and provide:
+1. An explanation of how the code relates to the query, taking into account the file structure
+2. Any suggested modifications to address the query, ensuring that imports and file paths are correct given the file structure
+3. The updated code for each file that needs changes
+4. Include the entire code including the import statements
+
+Pay special attention to the functions identified as relevant and the file structure when suggesting imports or calls between files.
+
+For each new or modified Python function, start with SCRIPT_X on a new line (where X is the script number), followed by the function in a Python code block. Only respond with what the user explicitly asks for.
+
+Return your response as a JSON object with the following structure:
+{
+  "explanation": "Your explanation here",
+  "modifications": [
+    {
+      "fileName": "path/to/example.py",
+      "changes": "A description of the changes made",
+      "scripts": [
+        {
+          "name": "function_name",
+          "content": "The full content of the function"
         }
-      });
+      ]
+    }
+  ]
+}`;
+
+    console.log('Full prompt being sent to the analyzing LLM:');
+    console.log(prompt);
+
+    console.log('Making API call');
+    const response = await makeApiCall('Project', 'Claude', prompt);
+    console.log('Received response from API:', JSON.stringify(response, null, 2));
+
+    if (!response || typeof response !== 'object' || !response.conversation) {
+      console.error('Unexpected API response structure:', response);
+      return res.status(500).json({ error: 'Unexpected response structure from API service' });
+    }
+
+    let result;
+    try {
+      result = safeJSONParse(response.conversation);
+      console.log('Parsed result:', JSON.stringify(result, null, 2));
+    } catch (parseError) {
+      console.error('Error parsing API response:', parseError);
+      return res.status(500).json({ error: 'Invalid response from API service' });
+    }
+
+    if (!result || !result.explanation || !Array.isArray(result.modifications)) {
+      console.error('Unexpected response structure after parsing:', result);
+      return res.status(500).json({ error: 'Unexpected response structure from API service' });
+    }
+
+    console.log('Processing modifications');
+    const safeModifications = result.modifications.map(mod => {
+      if (!mod) {
+        console.error('Encountered null or undefined modification');
+        return null;
+      }
+      return {
+        fileName: mod.fileName || 'Unknown File',
+        changes: mod.changes || 'No changes described',
+        scripts: Array.isArray(mod.scripts) ? mod.scripts.map(script => {
+          if (!script) {
+            console.error('Encountered null or undefined script');
+            return null;
+          }
+          // Remove the "SCRIPT_X" and "python" markers
+          const cleanContent = (script.content || '').replace(/^SCRIPT_\d+\s*\n?/, '').replace(/^python\s*\n?/, '');
+          return {
+            name: script.name || 'Unnamed Script',
+            content: cleanContent
+          };
+        }).filter(Boolean) : []
+      };
+    }).filter(Boolean);
+
+    console.log('Final response:', JSON.stringify({
+      explanation: result.explanation,
+      modifications: safeModifications
+    }, null, 2));
+
+    console.log('Sending response');
+    res.json({
+      explanation: result.explanation,
+      modifications: safeModifications,
+      usage: response.usage
+    });
+  } catch (error) {
+    console.error('Error in code analysis and modification:', error);
+    res.status(500).json({ error: 'Error in code analysis and modification process' });
+  }
+});
     
       app.post('/api/save-api-keys', async (req, res) => {
         try {
