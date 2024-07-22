@@ -26,6 +26,13 @@ const makeApiCall = async (mode, model, userInput) => {
           codeScripts: response.codeScripts,
           usage: response.usage
         };
+      case 'File':
+        response = await makeFileApiCall(model, userInput);
+        console.log('File API call response:', response);
+        return {
+          filename: response.filename,
+          usage: response.usage
+        };
       default:
         throw new Error(`Invalid mode: ${mode}`);
     }
@@ -34,6 +41,14 @@ const makeApiCall = async (mode, model, userInput) => {
     console.error('Error details:', error.response ? error.response.data : 'No response data');
     throw error;
   }
+};
+
+const makeFileApiCall = async (model, userInput) => {
+  console.log('Making file API call with model:', model);
+  const endpoint = `${API_URL}/file`;
+  const response = await axios.post(endpoint, { ...userInput, model });
+  console.log('File API response:', response.data);
+  return response.data;
 };
 
 const makeCodeApiCall = async (model, userInput) => {

@@ -1,0 +1,190 @@
+
+    You are an expert software developer. You practice perfectly principled programming. You follow these rules: 
+    1. Provide complete, copy-paste-ready code for all modifications.
+    2. Make only the exact changes requested by the user.
+    3. Add only features that are explicitly requested.
+    4. When updating existing code, include all unchanged parts to ensure completeness.
+    5. Maintain the existing code structure and style unless changes are specifically requested.
+    6. Ensure all imports and file paths are correct given the file structure.        
+    
+    Now take a deep breath and think this through step by step. You're great at this!  
+    
+    ##USER REQUEST: 
+    Make the player emoji a cowboy hat instead of a sunglass face
+  
+    
+    This is the user's file structure: {
+  "C:\\Users\\Jayson\\Better-Artifacts\\server\\projects\\dogeMaster\\GameDoc.md": "file",
+  "C:\\Users\\Jayson\\Better-Artifacts\\server\\projects\\dogeMaster\\admin_district_generation.py": "file",
+  "C:\\Users\\Jayson\\Better-Artifacts\\server\\projects\\dogeMaster\\audio_manager.py": "file",
+  "C:\\Users\\Jayson\\Better-Artifacts\\server\\projects\\dogeMaster\\audio_streaming.py": "file",
+  "C:\\Users\\Jayson\\Better-Artifacts\\server\\projects\\dogeMaster\\building.py": "file",
+  "C:\\Users\\Jayson\\Better-Artifacts\\server\\projects\\dogeMaster\\building_placement.py": "file",
+  "C:\\Users\\Jayson\\Better-Artifacts\\server\\projects\\dogeMaster\\city_grid_generator.py": "file",
+  "C:\\Users\\Jayson\\Better-Artifacts\\server\\projects\\dogeMaster\\common_imports.py": "file",
+  "C:\\Users\\Jayson\\Better-Artifacts\\server\\projects\\dogeMaster\\constants.py": "file",
+  "C:\\Users\\Jayson\\Better-Artifacts\\server\\projects\\dogeMaster\\conversation_handler.py": "file",
+  "C:\\Users\\Jayson\\Better-Artifacts\\server\\projects\\dogeMaster\\conversation_utils.py": "file",
+  "C:\\Users\\Jayson\\Better-Artifacts\\server\\projects\\dogeMaster\\database.py": "file",
+  "C:\\Users\\Jayson\\Better-Artifacts\\server\\projects\\dogeMaster\\decision.py": "file",
+  "C:\\Users\\Jayson\\Better-Artifacts\\server\\projects\\dogeMaster\\deepgram_connection.py": "file",
+  "C:\\Users\\Jayson\\Better-Artifacts\\server\\projects\\dogeMaster\\district_creation.py": "file",
+  "C:\\Users\\Jayson\\Better-Artifacts\\server\\projects\\dogeMaster\\district_generator.py": "file",
+  "C:\\Users\\Jayson\\Better-Artifacts\\server\\projects\\dogeMaster\\draw_game.py": "file",
+  "C:\\Users\\Jayson\\Better-Artifacts\\server\\projects\\dogeMaster\\draw_npcs.py": "file",
+  "C:\\Users\\Jayson\\Better-Artifacts\\server\\projects\\dogeMaster\\draw_player.py": "file",
+  "C:\\Users\\Jayson\\Better-Artifacts\\server\\projects\\dogeMaster\\draw_town.py": "file",
+  "C:\\Users\\Jayson\\Better-Artifacts\\server\\projects\\dogeMaster\\draw_ui.py": "file",
+  "C:\\Users\\Jayson\\Better-Artifacts\\server\\projects\\dogeMaster\\drawing_utils.py": "file",
+  "C:\\Users\\Jayson\\Better-Artifacts\\server\\projects\\dogeMaster\\emotional_reaction.py": "file",
+  "C:\\Users\\Jayson\\Better-Artifacts\\server\\projects\\dogeMaster\\event_generator.py": "file",
+  "C:\\Users\\Jayson\\Better-Artifacts\\server\\projects\\dogeMaster\\event_handler.py": "file",
+  "C:\\Users\\Jayson\\Better-Artifacts\\server\\projects\\dogeMaster\\family_generator.py": "file",
+  "C:\\Users\\Jayson\\Better-Artifacts\\server\\projects\\dogeMaster\\family_member.py": "file",
+  "C:\\Users\\Jayson\\Better-Artifacts\\server\\projects\\dogeMaster\\fractal_road.py": "file",
+  "C:\\Users\\Jayson\\Better-Artifacts\\server\\projects\\dogeMaster\\game_loop.py": "file",
+  "C:\\Users\\Jayson\\Better-Artifacts\\server\\projects\\dogeMaster\\game_state.py": "file",
+  "C:\\Users\\Jayson\\Better-Artifacts\\server\\projects\\dogeMaster\\game_state_manager.py": "file",
+  "C:\\Users\\Jayson\\Better-Artifacts\\server\\projects\\dogeMaster\\housing_manager.py": "file",
+  "C:\\Users\\Jayson\\Better-Artifacts\\server\\projects\\dogeMaster\\housing_state.py": "file",
+  "C:\\Users\\Jayson\\Better-Artifacts\\server\\projects\\dogeMaster\\interaction_handler.py": "file",
+  "C:\\Users\\Jayson\\Better-Artifacts\\server\\projects\\dogeMaster\\main.py": "file",
+  "C:\\Users\\Jayson\\Better-Artifacts\\server\\projects\\dogeMaster\\map_generator.py": "file",
+  "C:\\Users\\Jayson\\Better-Artifacts\\server\\projects\\dogeMaster\\map_size_calculator.py": "file",
+  "C:\\Users\\Jayson\\Better-Artifacts\\server\\projects\\dogeMaster\\medium_road_generation.py": "file",
+  "C:\\Users\\Jayson\\Better-Artifacts\\server\\projects\\dogeMaster\\menu.py": "file",
+  "C:\\Users\\Jayson\\Better-Artifacts\\server\\projects\\dogeMaster\\menu_background.jpg": "file",
+  "C:\\Users\\Jayson\\Better-Artifacts\\server\\projects\\dogeMaster\\menu_ui.py": "file",
+  "C:\\Users\\Jayson\\Better-Artifacts\\server\\projects\\dogeMaster\\menu_utils.py": "file",
+  "C:\\Users\\Jayson\\Better-Artifacts\\server\\projects\\dogeMaster\\name_generator.py": "file",
+  "C:\\Users\\Jayson\\Better-Artifacts\\server\\projects\\dogeMaster\\npc.py": "file",
+  "C:\\Users\\Jayson\\Better-Artifacts\\server\\projects\\dogeMaster\\npc_conversation.py": "file",
+  "C:\\Users\\Jayson\\Better-Artifacts\\server\\projects\\dogeMaster\\npc_generator.py": "file",
+  "C:\\Users\\Jayson\\Better-Artifacts\\server\\projects\\dogeMaster\\npc_interaction.py": "file",
+  "C:\\Users\\Jayson\\Better-Artifacts\\server\\projects\\dogeMaster\\npc_movement.py": "file",
+  "C:\\Users\\Jayson\\Better-Artifacts\\server\\projects\\dogeMaster\\npc_simulation.py": "file",
+  "C:\\Users\\Jayson\\Better-Artifacts\\server\\projects\\dogeMaster\\pause_menu.py": "file",
+  "C:\\Users\\Jayson\\Better-Artifacts\\server\\projects\\dogeMaster\\player.py": "file",
+  "C:\\Users\\Jayson\\Better-Artifacts\\server\\projects\\dogeMaster\\position_utils.py": "file",
+  "C:\\Users\\Jayson\\Better-Artifacts\\server\\projects\\dogeMaster\\river_generation.py": "file",
+  "C:\\Users\\Jayson\\Better-Artifacts\\server\\projects\\dogeMaster\\road_connection.py": "file",
+  "C:\\Users\\Jayson\\Better-Artifacts\\server\\projects\\dogeMaster\\road_generation.py": "file",
+  "C:\\Users\\Jayson\\Better-Artifacts\\server\\projects\\dogeMaster\\road_utils.py": "file",
+  "C:\\Users\\Jayson\\Better-Artifacts\\server\\projects\\dogeMaster\\roundabout_generation.py": "file",
+  "C:\\Users\\Jayson\\Better-Artifacts\\server\\projects\\dogeMaster\\save_load_manager.py": "file",
+  "C:\\Users\\Jayson\\Better-Artifacts\\server\\projects\\dogeMaster\\simulation.py": "file",
+  "C:\\Users\\Jayson\\Better-Artifacts\\server\\projects\\dogeMaster\\small_road_generation.py": "file",
+  "C:\\Users\\Jayson\\Better-Artifacts\\server\\projects\\dogeMaster\\speech_to_text.py": "file",
+  "C:\\Users\\Jayson\\Better-Artifacts\\server\\projects\\dogeMaster\\spider_web_roads.py": "file",
+  "C:\\Users\\Jayson\\Better-Artifacts\\server\\projects\\dogeMaster\\stats_generator.py": "file",
+  "C:\\Users\\Jayson\\Better-Artifacts\\server\\projects\\dogeMaster\\tile_types.py": "file",
+  "C:\\Users\\Jayson\\Better-Artifacts\\server\\projects\\dogeMaster\\town_generation.py": "file",
+  "C:\\Users\\Jayson\\Better-Artifacts\\server\\projects\\dogeMaster\\transcription_handler.py": "file",
+  "C:\\Users\\Jayson\\Better-Artifacts\\server\\projects\\dogeMaster\\utility_functions.py": "file",
+  "C:\\Users\\Jayson\\Better-Artifacts\\server\\projects\\dogeMaster\\utils.py": "file"
+}  
+    
+    Here are the relevant file names, what each file does, what each function in the file does and what functions that function calls:
+    
+    
+    File: draw_player.py
+    Content:
+    import pygame
+from drawing_utils import RED, EMOJIS, draw_emoji
+from utils import WIDTH, HEIGHT
+
+def draw_player(screen, player_position, player_facing, camera_x, camera_y):
+    screen_x = WIDTH // 2
+    screen_y = HEIGHT // 2
+    draw_emoji(screen, EMOJIS["player"], (screen_x, screen_y))
+    end_pos = (screen_x + player_facing[0] * 20, screen_y + player_facing[1] * 20)
+    pygame.draw.line(screen, RED, (screen_x, screen_y), end_pos, 2)
+    
+    Summary: This file contains functionality to draw a player on a Pygame screen based on player's position and facing direction.
+    
+    Relevant Functions:
+    - draw_player: Draws the player emoji on the screen and a line indicating the facing direction.
+
+    File: drawing_utils.py
+    Content:
+    import pygame
+from utils import WIDTH, HEIGHT
+
+# Colors
+WHITE = (255, 255, 255)
+RED = (255, 0, 0)
+BLUE = (0, 0, 255)
+GREEN = (0, 255, 0)
+PINK = (255, 192, 203)
+BLACK = (0, 0, 0)
+GRAY = (128, 128, 128)
+BROWN = (165, 42, 42)
+YELLOW = (255, 255, 0)
+
+# Emojis
+EMOJI_SIZE = 20
+EMOJIS = {
+    "default": "😐",
+    "talk": "🗨️",
+    "wave": "👋",
+    "attack": "😠",
+    "in_vision": "👀",
+    "player": "😎",
+    "fight": "😡",
+    "happy": "😊",
+    "angry": "😠"
+}
+
+# Load background image
+BACKGROUND_IMAGE = pygame.image.load("background.jpg")
+BACKGROUND_IMAGE = pygame.transform.scale(BACKGROUND_IMAGE, (WIDTH, HEIGHT))
+
+def get_font(size):
+    return pygame.font.Font(None, size)
+
+def get_emoji_font(size):
+    return pygame.font.Font(pygame.font.match_font('segoeuiemoji'), size)
+
+def draw_emoji(screen, emoji, position):
+    emoji_font = get_emoji_font(EMOJI_SIZE)
+    text_surface = emoji_font.render(emoji, True, BLACK)
+    text_rect = text_surface.get_rect(center=position)
+    screen.blit(text_surface, text_rect)
+
+def wrap_text(text, font, max_width):
+    words = text.split()
+    lines = []
+    current_line = []
+    for word in words:
+        test_line = " ".join(current_line + [word])
+        if font.size(test_line)[0] <= max_width:
+            current_line.append(word)
+        else:
+            lines.append(" ".join(current_line))
+            current_line = [word]
+    if current_line:
+        lines.append(" ".join(current_line))
+    return lines
+    
+    Summary: This file contains utility functions for rendering graphics, including emojis and text, using the Pygame library.
+    
+    Relevant Functions:
+    - get_emoji_font: Returns a Pygame font object specifically for rendering emoji characters of a specified size.
+- draw_emoji: Draws an emoji on the given screen at the specified position.
+    
+    Please analyze the code and provide: 
+    1. An explanation of how the code relates to the query, taking into account the file structure 
+    2. Any suggested modifications to address the query, ensuring that imports and file paths are correct given the file structure 
+    3. The updated code for each file that needs changes 
+    4. Include the entire code including the import statements.
+    
+    Pay special attention to the functions identified as relevant and the file structure when suggesting imports or calls between files. 
+    
+    You are an expert software developer. You practice perfectly principled programming. You follow these rules.
+    1. Provide complete, copy-paste-ready code for all modifications.
+    2. Make only the exact changes requested by the user.
+    3. Add only features that are explicitly requested.
+    4. When updating existing code, include all unchanged parts to ensure completeness.
+    5. Maintain the existing code structure and style unless changes are specifically requested.
+    6. Ensure all imports and file paths are correct given the file structure. 
+    

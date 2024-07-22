@@ -1,4 +1,6 @@
 const { setupEnvFile } = require('./envSetup');
+const fs = require('fs').promises;
+const path = require('path');
 
 // Call the setup function before any other imports or operations
 setupEnvFile().then(() => {
@@ -28,42 +30,37 @@ setupEnvFile().then(() => {
   });
 
   // Add or replace the existing safeJSONParse function with this improved version
-const safeJSONParse = (str) => {
-  // First, try parsing the string as-is
-  try {
-    return JSON.parse(str);
-  } catch (e) {
-    console.log("Initial parse failed, attempting to fix the JSON string");
-  }
+  const safeJSONParse = (str) => {
+    // First, try parsing the string as-is
+    try {
+      return JSON.parse(str);
+    } catch (e) {
+      console.log("Initial parse failed, attempting to fix the JSON string");
+    }
 
-  // If parsing fails, try to fix common issues
-  let fixedStr = str;
+    // If parsing fails, try to fix common issues
+    let fixedStr = str;
 
-  // Replace escaped newlines with actual newlines
-  fixedStr = fixedStr.replace(/\\n/g, '\n');
+    // Replace escaped newlines with actual newlines
+    fixedStr = fixedStr.replace(/\\n/g, '\n');
 
-  // Replace escaped quotes with single quotes
-  fixedStr = fixedStr.replace(/\\"/g, "'");
+    // Replace escaped quotes with single quotes
+    fixedStr = fixedStr.replace(/\\"/g, "'");
 
-  // Remove any remaining backslashes before quotes
-  fixedStr = fixedStr.replace(/\\/g, '');
+    // Remove any remaining backslashes before quotes
+    fixedStr = fixedStr.replace(/\\/g, '');
 
-  // Wrap property names in double quotes
-  fixedStr = fixedStr.replace(/(\w+):/g, '"$1":');
+    // Wrap property names in double quotes
+    fixedStr = fixedStr.replace(/(\w+):/g, '"$1":');
 
-  // Try parsing again
-  try {
-    return JSON.parse(fixedStr);
-  } catch (e) {
-    console.error("Failed to parse JSON even after fixing:", e);
-    throw new Error("Invalid JSON structure");
-  }
-};
-
-// Usage example:
-// const result = safeJSONParse(response.conversation);
-
-
+    // Try parsing again
+    try {
+      return JSON.parse(fixedStr);
+    } catch (e) {
+      console.error("Failed to parse JSON even after fixing:", e);
+      throw new Error("Invalid JSON structure");
+    }
+  };
 
   const upload = multer({ dest: 'uploads/' });
 
@@ -432,53 +429,61 @@ const safeJSONParse = (str) => {
       }
     });
     
-    // Add this function near the top of your server.js file, after your imports
+    app.post('/api/analyze-modify', async (req, res) => {
+      try {
+        console.log('Received request for analyze-modify');
+        const { query, selectedFiles, databaseContents } = req.body;
+        
+        if (!query || !selectedFiles || !databaseContents) {
+          console.error('Missing required fields in request body');
+          return res.status(400).json({ error: 'Missing required fields in request body' });
+        }
 
+        console.log('Query:', query);
+        console.log('Selected Files:', JSON.stringify(selectedFiles, null, 2));
+        console.log('Database Contents Keys:', Object.keys(databaseContents));
 
-// Replace your entire /api/analyze-modify endpoint with this code
-app.post('/api/analyze-modify', async (req, res) => {
-  try {
-    console.log('Received request for analyze-modify');
-    const { query, selectedFiles, databaseContents } = req.body;
-    
-    if (!query || !selectedFiles || !databaseContents) {
-      console.error('Missing required fields in request body');
-      return res.status(400).json({ error: 'Missing required fields in request body' });
-    }
+        console.log('Processing relevant files');
+        const relevantFilesContent = selectedFiles.map(file => {
+          // Find the matching file in the database contents
+          const fileEntry = Object.entries(databaseContents.files).find(([path, data]) => data.file_name === file.fileName);
+          
+          if (!fileEntry) {
+            console.error(`File data not found for ${file.fileName}`);
+            return null;
+          }
+          
+          const [filePath, fileData] = fileEntry;
+          return {
+            fileName: file.fileName,
+            filePath: filePath,
+            content: fileData.content,
+            summary: fileData.file_summary,
+            functions: (fileData.functions || []).filter(f => file.relevantFunctions.includes(f.function_name))
+          };
+        }).filter(Boolean);
 
-    console.log('Query:', query);
-    console.log('Selected Files:', JSON.stringify(selectedFiles, null, 2));
-    console.log('Database Contents Keys:', Object.keys(databaseContents));
+        if (relevantFilesContent.length === 0) {
+          console.error('No relevant file data found');
+          return res.status(400).json({ error: 'No relevant file data found' });
+        }
 
-    console.log('Processing relevant files');
-    const relevantFilesContent = selectedFiles.map(file => {
-      // Find the matching file in the database contents
-      const fileEntry = Object.entries(databaseContents.files).find(([path, data]) => data.file_name === file.fileName);
-      
-      if (!fileEntry) {
-        console.error(`File data not found for ${file.fileName}`);
-        return null;
-      }
-      
-      const [filePath, fileData] = fileEntry;
-      return {
-        fileName: file.fileName,
-        filePath: filePath,
-        content: fileData.content,
-        summary: fileData.file_summary,
-        functions: (fileData.functions || []).filter(f => file.relevantFunctions.includes(f.function_name))
-      };
-    }).filter(Boolean);
+        console.log('Relevant files content:', JSON.stringify(relevantFilesContent, null, 2));
 
-    if (relevantFilesContent.length === 0) {
-      console.error('No relevant file data found');
-      return res.status(400).json({ error: 'No relevant file data found' });
-    }
+        console.log('Preparing prompt for API call');
+        const prompt = `
+        You are an expert software developer. You practice being perfectly principled. You provide all the code in it's entirety to the user so the user can copy and paste. You only make the exact changes that the user requests. You only add features that are requsted. You update existing code and provide all the code that already existed so that the user can copy and paste.
+        Now take a deep breath and think this through step by step. You're great at this!
 
-    console.log('Relevant files content:', JSON.stringify(relevantFilesContent, null, 2));
+##USER REQUEST: ${query}
 
-    console.log('Preparing prompt for API call');
-    const prompt = `Given the following relevant files and their contents:
+This is the user's file structure:
+${JSON.stringify(databaseContents.fileStructure, null, 2)}
+
+Here are the relevant file names, what each file does and what 
+
+        
+Given the following relevant files and their contents:
 ${relevantFilesContent.map(file => `
 File: ${file.fileName}
 Content:
@@ -490,9 +495,6 @@ Relevant Functions:
 ${file.functions.map(f => `- ${f.function_name}: ${f.summary}`).join('\n')}`).join('\n')}
 
 And the following file structure:
-${JSON.stringify(databaseContents.fileStructure, null, 2)}
-
-And the user query: "${query}"
 
 Please analyze the code and provide:
 1. An explanation of how the code relates to the query, taking into account the file structure
@@ -521,84 +523,84 @@ Return your response as a JSON object with the following structure:
   ]
 }`;
 
-    console.log('Full prompt being sent to the analyzing LLM:');
-    console.log(prompt);
+        console.log('Full prompt being sent to the analyzing LLM:');
+        console.log(prompt);
 
-    console.log('Making API call');
-    const response = await makeApiCall('Project', 'Claude', prompt);
-    console.log('Received response from API:', JSON.stringify(response, null, 2));
+        console.log('Making API call');
+        const response = await makeApiCall('Project', 'Claude', prompt);
+        console.log('Received response from API:', JSON.stringify(response, null, 2));
 
-    if (!response || typeof response !== 'object' || !response.conversation) {
-      console.error('Unexpected API response structure:', response);
-      return res.status(500).json({ error: 'Unexpected response structure from API service' });
-    }
+        if (!response || typeof response !== 'object' || !response.conversation) {
+          console.error('Unexpected API response structure:', response);
+          return res.status(500).json({ error: 'Unexpected response structure from API service' });
+        }
 
-    let result;
-    try {
-      result = safeJSONParse(response.conversation);
-      console.log('Parsed result:', JSON.stringify(result, null, 2));
-    } catch (parseError) {
-      console.error('Error parsing API response:', parseError);
-      return res.status(500).json({ error: 'Invalid response from API service' });
-    }
+        let result;
+        try {
+          result = safeJSONParse(response.conversation);
+          console.log('Parsed result:', JSON.stringify(result, null, 2));
+        } catch (parseError) {
+          console.error('Error parsing API response:', parseError);
+          return res.status(500).json({ error: 'Invalid response from API service' });
+        }
 
-    if (!result || !result.explanation || !Array.isArray(result.modifications)) {
-      console.error('Unexpected response structure after parsing:', result);
-      return res.status(500).json({ error: 'Unexpected response structure from API service' });
-    }
+        if (!result || !result.explanation || !Array.isArray(result.modifications)) {
+          console.error('Unexpected response structure after parsing:', result);
+          return res.status(500).json({ error: 'Unexpected response structure from API service' });
+        }
 
-    console.log('Processing modifications');
-    const safeModifications = result.modifications.map(mod => {
-      if (!mod) {
-        console.error('Encountered null or undefined modification');
-        return null;
-      }
-      return {
-        fileName: mod.fileName || 'Unknown File',
-        changes: mod.changes || 'No changes described',
-        scripts: Array.isArray(mod.scripts) ? mod.scripts.map(script => {
-          if (!script) {
-            console.error('Encountered null or undefined script');
+        console.log('Processing modifications');
+        const safeModifications = result.modifications.map(mod => {
+          if (!mod) {
+            console.error('Encountered null or undefined modification');
             return null;
           }
-          // Remove the "SCRIPT_X" and "python" markers
-          const cleanContent = (script.content || '').replace(/^SCRIPT_\d+\s*\n?/, '').replace(/^python\s*\n?/, '');
           return {
-            name: script.name || 'Unnamed Script',
-            content: cleanContent
+            fileName: mod.fileName || 'Unknown File',
+            changes: mod.changes || 'No changes described',
+            scripts: Array.isArray(mod.scripts) ? mod.scripts.map(script => {
+              if (!script) {
+                console.error('Encountered null or undefined script');
+                return null;
+              }
+              // Remove the "SCRIPT_X" and "python" markers
+              const cleanContent = (script.content || '').replace(/^SCRIPT_\d+\s*\n?/, '').replace(/^python\s*\n?/, '');
+              return {
+                name: script.name || 'Unnamed Script',
+                content: cleanContent
+              };
+            }).filter(Boolean) : []
           };
-        }).filter(Boolean) : []
-      };
-    }).filter(Boolean);
+        }).filter(Boolean);
 
-    console.log('Final response:', JSON.stringify({
-      explanation: result.explanation,
-      modifications: safeModifications
-    }, null, 2));
+        console.log('Final response:', JSON.stringify({
+          explanation: result.explanation,
+          modifications: safeModifications
+        }, null, 2));
 
-    console.log('Sending response');
-    res.json({
-      explanation: result.explanation,
-      modifications: safeModifications,
-      usage: response.usage
+        console.log('Sending response');
+        res.json({
+          explanation: result.explanation,
+          modifications: safeModifications,
+          usage: response.usage
+        });
+      } catch (error) {
+        console.error('Error in code analysis and modification:', error);
+        res.status(500).json({ error: 'Error in code analysis and modification process' });
+      }
     });
-  } catch (error) {
-    console.error('Error in code analysis and modification:', error);
-    res.status(500).json({ error: 'Error in code analysis and modification process' });
-  }
-});
     
-      app.post('/api/save-api-keys', async (req, res) => {
-        try {
-          const { claudeApiKey, openaiApiKey, openaiAssistantId } = req.body;
-      
-          if (!claudeApiKey && !openaiApiKey && !openaiAssistantId) {
-            return res.status(400).json({ error: 'At least one API key or Assistant ID must be provided' });
-          }
-      
-          const envPath = path.resolve(__dirname, '.env');
+    app.post('/api/save-api-keys', async (req, res) => {
+      try {
+        const { claudeApiKey, openaiApiKey, openaiAssistantId } = req.body;
+    
+        if (!claudeApiKey && !openaiApiKey && !openaiAssistantId) {
+          return res.status(400).json({ error: 'At least one API key or Assistant ID must be provided' });
+        }
+    
+        const envPath = path.resolve(__dirname, '.env');
         let envContent = await fs.readFile(envPath, 'utf8');
-    
+  
         if (claudeApiKey) {
           const claudeKeyRegex = /VUE_APP_ANTHROPIC_API_KEY=.*/;
           if (claudeKeyRegex.test(envContent)) {
@@ -607,7 +609,7 @@ Return your response as a JSON object with the following structure:
             envContent += `\nVUE_APP_ANTHROPIC_API_KEY=${claudeApiKey}`;
           }
         }
-    
+  
         if (openaiApiKey) {
           const openaiKeyRegex = /VUE_APP_OPENAI_API_KEY=.*/;
           if (openaiKeyRegex.test(envContent)) {
@@ -625,12 +627,12 @@ Return your response as a JSON object with the following structure:
             envContent += `\nVUE_APP_OPENAI_ASSISTANT_ID=${openaiAssistantId}`;
           }
         }
-    
+  
         await fs.writeFile(envPath, envContent);
-    
+  
         // Refresh environment variables
         require('dotenv').config();
-    
+  
         res.json({ message: 'API keys and Assistant ID saved successfully' });
       } catch (error) {
         console.error('Error saving API keys:', error);
@@ -638,24 +640,115 @@ Return your response as a JSON object with the following structure:
       }
     });
 
-  function startServer(port) {
-    app.listen(port, () => {
-      console.log(`Server running on port ${port}`);
-      console.log('Environment variables:');
-      console.log('OPENAI_API_KEY:', process.env.VUE_APP_OPENAI_API_KEY ? 'Set' : 'Not set');
-      console.log('ANTHROPIC_API_KEY:', process.env.VUE_APP_ANTHROPIC_API_KEY ? 'Set' : 'Not set');
-      console.log('OPENAI_ASSISTANT_ID:', process.env.VUE_APP_OPENAI_ASSISTANT_ID ? 'Set' : 'Not set');
-    }).on('error', (err) => {
-      if (err.code === 'EADDRINUSE') {
-        console.log(`Port ${port} is busy, trying with port ${port + 1}`);
-        startServer(port + 1);
-      } else {
-        console.error('Server error:', err);
+    app.post('/api/file', async (req, res) => {
+      try {
+        const { query, relevantFiles, databaseContents } = req.body;
+    
+        const relevantFilesContent = relevantFiles.map(file => {
+          const fileEntry = Object.entries(databaseContents.files).find(([path, data]) => data.file_name === file.fileName);
+          
+          if (!fileEntry) {
+            console.error(`File data not found for ${file.fileName}`);
+            return null;
+          }
+          
+          const [filePath, fileData] = fileEntry;
+          return {
+            fileName: file.fileName,
+            filePath: filePath,
+            content: fileData.content,
+            summary: fileData.file_summary,
+            functions: (fileData.functions || []).filter(f => file.relevantFunctions.includes(f.function_name))
+          };
+        }).filter(Boolean);
+    
+        const prompt = `
+    You are an expert software developer. You practice perfectly principled programming. You follow these rules: 
+    1. Provide complete, copy-paste-ready code for all modifications.
+    2. Make only the exact changes requested by the user.
+    3. Add only features that are explicitly requested.
+    4. When updating existing code, include all unchanged parts to ensure completeness.
+    5. Maintain the existing code structure and style unless changes are specifically requested.
+    6. Ensure all imports and file paths are correct given the file structure.        
+    
+    Now take a deep breath and think this through step by step. You're great at this!  
+    
+    ##USER REQUEST: 
+    ${query}  
+    
+    This is the user's file structure: ${JSON.stringify(databaseContents.fileStructure, null, 2)}  
+    
+    Here are the relevant file names, what each file does, what each function in the file does and what functions that function calls:
+    
+    ${relevantFilesContent.map(file => `
+    File: ${file.fileName}
+    Content:
+    ${file.content}
+    
+    Summary: ${file.summary}
+    
+    Relevant Functions:
+    ${file.functions.map(f => `- ${f.function_name}: ${f.summary}`).join('\n')}`).join('\n')}
+    
+    Please analyze the code and provide: 
+    1. An explanation of how the code relates to the query, taking into account the file structure 
+    2. Any suggested modifications to address the query, ensuring that imports and file paths are correct given the file structure 
+    3. The updated code for each file that needs changes 
+    4. Include the entire code including the import statements.
+    
+    Pay special attention to the functions identified as relevant and the file structure when suggesting imports or calls between files. 
+    
+    You are an expert software developer. You practice perfectly principled programming. You follow these rules.
+    1. Provide complete, copy-paste-ready code for all modifications.
+    2. Make only the exact changes requested by the user.
+    3. Add only features that are explicitly requested.
+    4. When updating existing code, include all unchanged parts to ensure completeness.
+    5. Maintain the existing code structure and style unless changes are specifically requested.
+    6. Ensure all imports and file paths are correct given the file structure. 
+    `;
+    
+        // Ensure the 'prompts' directory exists
+        const promptsDir = path.join(__dirname, 'prompts');
+        await fs.mkdir(promptsDir, { recursive: true });
+    
+        // Generate a unique filename and save the prompt
+        const filename = `prompt_${Date.now()}.txt`;
+        const filePath = path.join(promptsDir, filename);
+        await fs.writeFile(filePath, prompt);
+    
+        console.log(`Prompt saved to file: ${filePath}`);
+    
+        res.json({
+          filename: filename,
+          usage: {
+            prompt_tokens: prompt.length, // This is a rough estimate
+            completion_tokens: 0 // No completion for File mode
+          }
+        });
+      } catch (error) {
+        console.error('Error in File mode:', error);
+        res.status(500).json({ error: 'Error processing File mode request' });
       }
     });
-  }
 
-  app.get('/api/get-api-keys', (req, res) => {
+    function startServer(port) {
+      app.listen(port, () => {
+        console.log(`Server running on port ${port}`);
+        console.log('Environment variables:');
+        console.log('OPENAI_API_KEY:', process.env.VUE_APP_OPENAI_API_KEY ? 'Set' : 'Not set');
+        console.log('ANTHROPIC_API_KEY:', process.env.VUE_APP_ANTHROPIC_API_KEY ? 'Set' : 'Not set');
+        console.log('OPENAI_ASSISTANT_ID:', process.env.VUE_APP_OPENAI_ASSISTANT_ID ? 'Set' : 'Not set');
+      }).on('error', (err) => {
+        if (err.code === 'EADDRINUSE') {
+          console.log(`Port ${port} is busy, trying with port ${port + 1}`);
+          startServer(port + 1);
+        } else {
+          console.error('Server error:', err);
+        }
+      });
+    }
+
+    app.get('/api/get-api-keys', (req, res) => {
       res.json({
         claudeApiKey: process.env.VUE_APP_ANTHROPIC_API_KEY || 'No Key',
         openaiApiKey: process.env.VUE_APP_OPENAI_API_KEY || '',

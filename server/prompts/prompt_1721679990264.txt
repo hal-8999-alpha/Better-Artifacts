@@ -1,0 +1,753 @@
+
+    You are an expert software developer. You practice perfectly principled programming. You follow these rules: 
+    1. Provide complete, copy-paste-ready code for all modifications.
+    2. Make only the exact changes requested by the user.
+    3. Add only features that are explicitly requested.
+    4. When updating existing code, include all unchanged parts to ensure completeness.
+    5. Maintain the existing code structure and style unless changes are specifically requested.
+    6. Ensure all imports and file paths are correct given the file structure.        
+    
+    Now take a deep breath and think this through step by step. You're great at this!  
+    
+    ##USER REQUEST: 
+    Make the menu display more precise progress statements when a new game is created
+   
+    
+    This is the user's file structure: {
+  "C:\\Users\\Jayson\\Better-Artifacts\\server\\projects\\dogeMaster\\GameDoc.md": "file",
+  "C:\\Users\\Jayson\\Better-Artifacts\\server\\projects\\dogeMaster\\admin_district_generation.py": "file",
+  "C:\\Users\\Jayson\\Better-Artifacts\\server\\projects\\dogeMaster\\audio_manager.py": "file",
+  "C:\\Users\\Jayson\\Better-Artifacts\\server\\projects\\dogeMaster\\audio_streaming.py": "file",
+  "C:\\Users\\Jayson\\Better-Artifacts\\server\\projects\\dogeMaster\\building.py": "file",
+  "C:\\Users\\Jayson\\Better-Artifacts\\server\\projects\\dogeMaster\\building_placement.py": "file",
+  "C:\\Users\\Jayson\\Better-Artifacts\\server\\projects\\dogeMaster\\city_grid_generator.py": "file",
+  "C:\\Users\\Jayson\\Better-Artifacts\\server\\projects\\dogeMaster\\common_imports.py": "file",
+  "C:\\Users\\Jayson\\Better-Artifacts\\server\\projects\\dogeMaster\\constants.py": "file",
+  "C:\\Users\\Jayson\\Better-Artifacts\\server\\projects\\dogeMaster\\conversation_handler.py": "file",
+  "C:\\Users\\Jayson\\Better-Artifacts\\server\\projects\\dogeMaster\\conversation_utils.py": "file",
+  "C:\\Users\\Jayson\\Better-Artifacts\\server\\projects\\dogeMaster\\database.py": "file",
+  "C:\\Users\\Jayson\\Better-Artifacts\\server\\projects\\dogeMaster\\decision.py": "file",
+  "C:\\Users\\Jayson\\Better-Artifacts\\server\\projects\\dogeMaster\\deepgram_connection.py": "file",
+  "C:\\Users\\Jayson\\Better-Artifacts\\server\\projects\\dogeMaster\\district_creation.py": "file",
+  "C:\\Users\\Jayson\\Better-Artifacts\\server\\projects\\dogeMaster\\district_generator.py": "file",
+  "C:\\Users\\Jayson\\Better-Artifacts\\server\\projects\\dogeMaster\\draw_game.py": "file",
+  "C:\\Users\\Jayson\\Better-Artifacts\\server\\projects\\dogeMaster\\draw_npcs.py": "file",
+  "C:\\Users\\Jayson\\Better-Artifacts\\server\\projects\\dogeMaster\\draw_player.py": "file",
+  "C:\\Users\\Jayson\\Better-Artifacts\\server\\projects\\dogeMaster\\draw_town.py": "file",
+  "C:\\Users\\Jayson\\Better-Artifacts\\server\\projects\\dogeMaster\\draw_ui.py": "file",
+  "C:\\Users\\Jayson\\Better-Artifacts\\server\\projects\\dogeMaster\\drawing_utils.py": "file",
+  "C:\\Users\\Jayson\\Better-Artifacts\\server\\projects\\dogeMaster\\emotional_reaction.py": "file",
+  "C:\\Users\\Jayson\\Better-Artifacts\\server\\projects\\dogeMaster\\event_generator.py": "file",
+  "C:\\Users\\Jayson\\Better-Artifacts\\server\\projects\\dogeMaster\\event_handler.py": "file",
+  "C:\\Users\\Jayson\\Better-Artifacts\\server\\projects\\dogeMaster\\family_generator.py": "file",
+  "C:\\Users\\Jayson\\Better-Artifacts\\server\\projects\\dogeMaster\\family_member.py": "file",
+  "C:\\Users\\Jayson\\Better-Artifacts\\server\\projects\\dogeMaster\\fractal_road.py": "file",
+  "C:\\Users\\Jayson\\Better-Artifacts\\server\\projects\\dogeMaster\\game_loop.py": "file",
+  "C:\\Users\\Jayson\\Better-Artifacts\\server\\projects\\dogeMaster\\game_state.py": "file",
+  "C:\\Users\\Jayson\\Better-Artifacts\\server\\projects\\dogeMaster\\game_state_manager.py": "file",
+  "C:\\Users\\Jayson\\Better-Artifacts\\server\\projects\\dogeMaster\\housing_manager.py": "file",
+  "C:\\Users\\Jayson\\Better-Artifacts\\server\\projects\\dogeMaster\\housing_state.py": "file",
+  "C:\\Users\\Jayson\\Better-Artifacts\\server\\projects\\dogeMaster\\interaction_handler.py": "file",
+  "C:\\Users\\Jayson\\Better-Artifacts\\server\\projects\\dogeMaster\\main.py": "file",
+  "C:\\Users\\Jayson\\Better-Artifacts\\server\\projects\\dogeMaster\\map_generator.py": "file",
+  "C:\\Users\\Jayson\\Better-Artifacts\\server\\projects\\dogeMaster\\map_size_calculator.py": "file",
+  "C:\\Users\\Jayson\\Better-Artifacts\\server\\projects\\dogeMaster\\medium_road_generation.py": "file",
+  "C:\\Users\\Jayson\\Better-Artifacts\\server\\projects\\dogeMaster\\menu.py": "file",
+  "C:\\Users\\Jayson\\Better-Artifacts\\server\\projects\\dogeMaster\\menu_background.jpg": "file",
+  "C:\\Users\\Jayson\\Better-Artifacts\\server\\projects\\dogeMaster\\menu_ui.py": "file",
+  "C:\\Users\\Jayson\\Better-Artifacts\\server\\projects\\dogeMaster\\menu_utils.py": "file",
+  "C:\\Users\\Jayson\\Better-Artifacts\\server\\projects\\dogeMaster\\name_generator.py": "file",
+  "C:\\Users\\Jayson\\Better-Artifacts\\server\\projects\\dogeMaster\\npc.py": "file",
+  "C:\\Users\\Jayson\\Better-Artifacts\\server\\projects\\dogeMaster\\npc_conversation.py": "file",
+  "C:\\Users\\Jayson\\Better-Artifacts\\server\\projects\\dogeMaster\\npc_generator.py": "file",
+  "C:\\Users\\Jayson\\Better-Artifacts\\server\\projects\\dogeMaster\\npc_interaction.py": "file",
+  "C:\\Users\\Jayson\\Better-Artifacts\\server\\projects\\dogeMaster\\npc_movement.py": "file",
+  "C:\\Users\\Jayson\\Better-Artifacts\\server\\projects\\dogeMaster\\npc_simulation.py": "file",
+  "C:\\Users\\Jayson\\Better-Artifacts\\server\\projects\\dogeMaster\\pause_menu.py": "file",
+  "C:\\Users\\Jayson\\Better-Artifacts\\server\\projects\\dogeMaster\\player.py": "file",
+  "C:\\Users\\Jayson\\Better-Artifacts\\server\\projects\\dogeMaster\\position_utils.py": "file",
+  "C:\\Users\\Jayson\\Better-Artifacts\\server\\projects\\dogeMaster\\river_generation.py": "file",
+  "C:\\Users\\Jayson\\Better-Artifacts\\server\\projects\\dogeMaster\\road_connection.py": "file",
+  "C:\\Users\\Jayson\\Better-Artifacts\\server\\projects\\dogeMaster\\road_generation.py": "file",
+  "C:\\Users\\Jayson\\Better-Artifacts\\server\\projects\\dogeMaster\\road_utils.py": "file",
+  "C:\\Users\\Jayson\\Better-Artifacts\\server\\projects\\dogeMaster\\roundabout_generation.py": "file",
+  "C:\\Users\\Jayson\\Better-Artifacts\\server\\projects\\dogeMaster\\save_load_manager.py": "file",
+  "C:\\Users\\Jayson\\Better-Artifacts\\server\\projects\\dogeMaster\\simulation.py": "file",
+  "C:\\Users\\Jayson\\Better-Artifacts\\server\\projects\\dogeMaster\\small_road_generation.py": "file",
+  "C:\\Users\\Jayson\\Better-Artifacts\\server\\projects\\dogeMaster\\speech_to_text.py": "file",
+  "C:\\Users\\Jayson\\Better-Artifacts\\server\\projects\\dogeMaster\\spider_web_roads.py": "file",
+  "C:\\Users\\Jayson\\Better-Artifacts\\server\\projects\\dogeMaster\\stats_generator.py": "file",
+  "C:\\Users\\Jayson\\Better-Artifacts\\server\\projects\\dogeMaster\\tile_types.py": "file",
+  "C:\\Users\\Jayson\\Better-Artifacts\\server\\projects\\dogeMaster\\town_generation.py": "file",
+  "C:\\Users\\Jayson\\Better-Artifacts\\server\\projects\\dogeMaster\\transcription_handler.py": "file",
+  "C:\\Users\\Jayson\\Better-Artifacts\\server\\projects\\dogeMaster\\utility_functions.py": "file",
+  "C:\\Users\\Jayson\\Better-Artifacts\\server\\projects\\dogeMaster\\utils.py": "file"
+}  
+    
+    Here are the relevant file names, what each file does, what each function in the file does and what functions that function calls:
+    
+    
+    File: menu.py
+    Content:
+    import pygame
+import asyncio
+import pygame_gui
+from pygame_gui.elements import UIDropDownMenu, UIButton, UILabel
+from utils import WIDTH, HEIGHT
+from menu_ui import Button, draw_menu, draw_name_input, draw_loading_screen
+from menu_utils import load_menu_assets, initialize_menu_assets
+from game_state_manager import generate_new_game
+from save_load_manager import load_game
+
+RIVER_PRESETS = ["Straighter", "L Shaped", "Snake", "Curvy", "Erratic"]
+
+async def load_game_with_progress(screen, game_state):
+    progress = 0
+    messages = [
+        "Generating town map...",
+        "Creating river and bridges...",
+        "Generating administration district...",
+        "Creating other districts...",
+        "Placing buildings...",
+        "Adding walls...",
+        "Generating NPCs...",
+        "Assigning building owners and housing...",
+        "Generating events...",
+        "Assigning player to a family...",
+        "Saving game state..."
+    ]
+
+    async def update_progress(message, sub_progress=0):
+        nonlocal progress
+        current_progress = progress + sub_progress
+        draw_loading_screen(screen, current_progress, message)
+        pygame.display.flip()
+        await asyncio.sleep(0.01)  # Small delay to allow screen update
+
+    for i, message in enumerate(messages):
+        progress = i / len(messages)
+        await update_progress(message)
+
+        if i == 0:  # "Generating town map..."
+            if game_state['new_game']:
+                town_map, buildings, npcs = await generate_new_game(game_state, update_progress)
+            else:
+                town_map, buildings, npcs = await load_game(game_state)
+        else:
+            await asyncio.sleep(0.5)  # Simulate some processing time for other steps
+
+    game_state['town_map'] = town_map
+    game_state['buildings'] = buildings
+    game_state['npcs'] = npcs
+
+    # Final loading screen
+    await update_progress("Game loaded successfully!")
+    await asyncio.sleep(1)  # Show the final message for a second
+
+async def menu_loop(game_state):
+    screen = game_state['screen']
+    
+    # Initialize menu assets
+    menu_assets = initialize_menu_assets(WIDTH, HEIGHT)
+    
+    buttons = [
+        Button("New Game", WIDTH // 2 - 100, HEIGHT // 2, 200, 50, (100, 100, 100), (150, 150, 150), (255, 255, 255), 32),
+        Button("Load Game", WIDTH // 2 - 100, HEIGHT // 2 + 70, 200, 50, (100, 100, 100), (150, 150, 150), (255, 255, 255), 32),
+        Button("Quit", WIDTH // 2 - 100, HEIGHT // 2 + 140, 200, 50, (100, 100, 100), (150, 150, 150), (255, 255, 255), 32)
+    ]
+
+    pygame.mixer.music.load("menu_background.mp3")
+    pygame.mixer.music.set_volume(0.15)
+    pygame.mixer.music.play(-1)
+    
+    while True:
+        draw_menu(screen, buttons, menu_assets)
+        
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                return False
+            elif event.type == pygame.MOUSEBUTTONDOWN:
+                if event.button == 1:
+                    for i, button in enumerate(buttons):
+                        if button.is_hovered():
+                            if i == 0:  # New Game
+                                pygame.mixer.music.stop()
+                                player_info = await get_player_info(screen)
+                                if player_info:
+                                    player_name, player_class, river_preset = player_info
+                                    game_state['player_name'] = player_name
+                                    game_state['player_class'] = player_class
+                                    game_state['river_preset'] = river_preset
+                                    game_state['new_game'] = True
+                                    await load_game_with_progress(screen, game_state)
+                                    return True
+                            elif i == 1:  # Load Game
+                                pygame.mixer.music.stop()
+                                game_state['new_game'] = False
+                                await load_game_with_progress(screen, game_state)
+                                return True
+                            elif i == 2:  # Quit
+                                return False
+        
+        await asyncio.sleep(0.1)
+
+async def get_player_info(screen):
+    input_text = ""
+    class_options = ["Government", "Artisan", "Criminal"]
+    selected_class = class_options[0]
+    selected_river_preset = RIVER_PRESETS[0]
+    
+    manager = pygame_gui.UIManager((WIDTH, HEIGHT))
+    
+    name_label = UILabel(relative_rect=pygame.Rect((WIDTH // 2 - 100, HEIGHT // 2 - 120), (200, 30)),
+                         text="Enter Your Name:",
+                         manager=manager)
+    
+    class_label = UILabel(relative_rect=pygame.Rect((WIDTH // 2 - 100, HEIGHT // 2 - 40), (200, 30)),
+                          text="Choose Your Class:",
+                          manager=manager)
+    
+    class_dropdown = UIDropDownMenu(
+        options_list=class_options,
+        starting_option=selected_class,
+        relative_rect=pygame.Rect((WIDTH // 2 - 100, HEIGHT // 2 - 10), (200, 30)),
+        manager=manager
+    )
+
+    river_label = UILabel(relative_rect=pygame.Rect((WIDTH // 2 - 100, HEIGHT // 2 + 30), (200, 30)),
+                          text="Choose River Type:",
+                          manager=manager)
+    
+    river_dropdown = UIDropDownMenu(
+        options_list=RIVER_PRESETS,
+        starting_option=selected_river_preset,
+        relative_rect=pygame.Rect((WIDTH // 2 - 100, HEIGHT // 2 + 60), (200, 30)),
+        manager=manager
+    )
+
+    start_button = UIButton(
+        relative_rect=pygame.Rect((WIDTH // 2 - 50, HEIGHT // 2 + 110), (100, 40)),
+        text='Start',
+        manager=manager
+    )
+
+    hover_sound = pygame.mixer.Sound("hover.mp3")
+    clock = pygame.time.Clock()
+    start_button_hovered = False
+
+    while True:
+        time_delta = clock.tick(60)/1000.0
+        
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                return None
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_BACKSPACE:
+                    input_text = input_text[:-1]
+                elif event.key == pygame.K_RETURN:
+                    if input_text and selected_class and selected_river_preset:
+                        return input_text, selected_class, selected_river_preset
+                else:
+                    input_text += event.unicode
+            
+            if event.type == pygame_gui.UI_DROP_DOWN_MENU_CHANGED:
+                if event.ui_element == class_dropdown:
+                    selected_class = event.text
+                elif event.ui_element == river_dropdown:
+                    selected_river_preset = event.text
+            
+            if event.type == pygame_gui.UI_BUTTON_PRESSED:
+                if event.ui_element == start_button:
+                    if input_text and selected_class and selected_river_preset:
+                        return input_text, selected_class, selected_river_preset
+            
+            manager.process_events(event)
+
+        manager.update(time_delta)
+        
+        screen.fill((30, 30, 30))
+        
+        # Draw name input box
+        pygame.draw.rect(screen, (100, 100, 100), (WIDTH // 2 - 100, HEIGHT // 2 - 90, 200, 30))
+        font = pygame.font.Font(None, 24)
+        name_surface = font.render(input_text, True, (255, 255, 255))
+        screen.blit(name_surface, (WIDTH // 2 - 95, HEIGHT // 2 - 85))
+        
+        manager.draw_ui(screen)
+        
+        pygame.display.flip()
+        await asyncio.sleep(0.01)
+
+if __name__ == "__main__":
+    pygame.init()
+    screen = pygame.display.set_mode((WIDTH, HEIGHT))
+    pygame.display.set_caption("Medieval Town NPC Simulation")
+    
+    game_state = {'screen': screen}
+    
+    asyncio.run(menu_loop(game_state))
+    
+    pygame.quit()
+    
+    Summary: This file contains the menu logic for a game, including loading game data, displaying menu interfaces, and getting player information.
+    
+    Relevant Functions:
+    - load_game_with_progress: Asynchronously loads the game with a progress indication on the screen, updating various game states as the loading progresses.
+- menu_loop: Handles the main menu interface, allowing the player to start a new game, load an existing game, or quit the application.
+- get_player_info: Displays a user interface for the player to input their name and select their class and river type before starting the game.
+
+    File: main.py
+    Content:
+    import asyncio
+import pygame
+import pygame_gui
+from dotenv import load_dotenv
+import traceback
+
+# Load environment variables
+load_dotenv()
+
+# Initialize Pygame
+pygame.init()
+pygame.mixer.init()
+
+# Now import the modules that depend on Pygame
+from game_state import init_game_state
+from menu import menu_loop
+from game_loop import game_loop
+from speech_to_text import calibrate_microphone, initialize, cleanup
+from utils import WIDTH, HEIGHT
+from audio_manager import stop_audio_thread
+
+async def main():
+    try:
+        print("Starting main function...")
+        await calibrate_microphone()
+        await initialize()
+        
+        screen = pygame.display.set_mode((WIDTH, HEIGHT))
+        pygame.display.set_caption("Medieval Town NPC Simulation")
+        
+        manager = pygame_gui.UIManager((WIDTH, HEIGHT))
+        
+        game_state = init_game_state()
+        game_state['screen'] = screen
+        game_state['manager'] = manager
+        
+        # init_pause_menu(game_state, manager, WIDTH, HEIGHT)
+        
+        while True:
+            try:
+                start_game = await menu_loop(game_state)
+                if not start_game:
+                    break
+                
+                await game_loop(game_state)
+            except Exception as e:
+                print(f"An error occurred during the game loop: {e}")
+                print("Traceback:")
+                traceback.print_exc()
+                break
+        
+    except Exception as e:
+        print(f"An error occurred in the main function: {e}")
+        print("Traceback:")
+        traceback.print_exc()
+    finally:
+        print("Cleaning up...")
+        pygame.quit()
+        await cleanup()
+        stop_audio_thread()
+        print("Cleanup completed.")
+
+if __name__ == "__main__":
+    print("Starting the game...")
+    asyncio.run(main())
+    print("Game has ended.")
+    
+    Summary: This script initializes and runs a Pygame-based medieval town NPC simulation game, including setup of audio, GUI, game state, and the main game loop.
+    
+    Relevant Functions:
+    - main: Asynchronous main function that initializes the game, including loading resources, displaying the menu, and running the main game loop.
+
+    File: game_state_manager.py
+    Content:
+    import random
+from map_generator import generate_town_map
+from constants import TILE_SIZE
+from tile_types import TileType
+from npc_generator import generate_npcs
+from housing_manager import assign_building_owners_and_housing
+from event_generator import generate_events
+from database import save_npcs, save_game_state, load_latest_save
+
+async def generate_new_game(game_state, update_progress):
+    print("Starting new game generation...")
+    NUM_NPCS = 100  # Set the number of NPCs
+    BUILDING_SPACING = 4  # Set the building spacing
+    
+    await update_progress("Generating NPCs...")
+    print("Generating NPCs...")
+    npcs = generate_npcs(NUM_NPCS, None)  # Pass None for town_map as it's not generated yet
+    print(f"Generated {len(npcs)} NPCs.")
+    
+    await update_progress("Generating town map...")
+    print(f"Generating town map for {NUM_NPCS} NPCs...")
+    town_map, buildings, player_spawn, admin_buildings = generate_town_map(NUM_NPCS, game_state['river_preset'], game_state['screen'], game_state['player_class'], npcs, BUILDING_SPACING)
+    print("Town map generated.")
+    print(f"Player spawn point: {player_spawn}")
+    
+    # Set the player's initial position
+    game_state['player_position'] = list(player_spawn)
+    print(f"Player position set to: {game_state['player_position']}")
+    
+    await update_progress("Assigning building owners and housing...")
+    print("Assigning building owners and housing...")
+    assign_building_owners_and_housing(buildings, npcs)
+    print("Building owners and housing assigned.")
+    
+    await update_progress("Generating events...")
+    print("Generating events...")
+    events = generate_events(2000, npcs)
+    print("Events generated.")
+    
+    await update_progress("Assigning player to a family...")
+    print("Assigning player to a family...")
+    player_family = assign_player_to_family(game_state, npcs)
+    print(f"Player assigned to {player_family} family.")
+    
+    await update_progress("Saving initial game state...")
+    print("Saving initial game state...")
+    # Create a new dictionary with only the serializable game state data
+    serializable_game_state = {
+        'town_map': [[tile.name for tile in row] for row in town_map],
+        'buildings': [
+            {
+                'x': b.x,
+                'y': b.y,
+                'width': b.width,
+                'height': b.height,
+                'name': b.name,
+                'type': b.type.name,
+                'residents': [r.name for r in b.residents],
+                'owner': b.owner.name if b.owner else None
+            }
+            for b in buildings
+        ],
+        'player_position': game_state['player_position'],
+        'player_facing': [1, 0],  # Default facing right
+        'player_name': game_state.get('player_name', ''),
+        'player_class': game_state.get('player_class', ''),
+        'river_preset': game_state.get('river_preset', 'Straighter'),
+        'building_spacing': BUILDING_SPACING,
+    }
+    save_game_state(serializable_game_state)
+    save_npcs(npcs)
+    print("Initial game state saved.")
+    
+    await update_progress("New game generation completed.")
+    print("New game generation completed.")
+    return town_map, buildings, npcs
+
+async def load_or_generate_game(game_state, update_progress):
+    if game_state.get('new_game', False):
+        return await generate_new_game(game_state, update_progress)
+    else:
+        saved_game = load_latest_save()
+        if saved_game:
+            # Load the saved game
+            print("Loading saved game...")
+            # Here you would need to reconstruct your town_map, buildings, and npcs from the saved data
+            # This is a placeholder and would need to be implemented based on your save data structure
+            town_map = [[TileType[tile] for tile in row] for row in saved_game['town_map']]
+            buildings = []  # You would need to reconstruct Building objects from saved_game['buildings']
+            npcs = []  # You would need to reconstruct NPC objects from your saved NPC data
+            game_state['building_spacing'] = saved_game.get('building_spacing', 2)  # Load building spacing
+            return town_map, buildings, npcs
+        else:
+            return await generate_new_game(game_state, update_progress)
+
+def assign_player_to_family(game_state, npcs):
+    player_class = game_state.get('player_class', random.choice(["Government", "Artisan", "Criminal"]))
+    potential_families = [npc for npc in npcs if npc.social_class == player_class and len(npc.family) > 0]
+    
+    if not potential_families:
+        # If no families in the chosen class, create a new family
+        family_head = next(npc for npc in npcs if npc.social_class == player_class)
+        create_family_for_npc(family_head, npcs)
+        potential_families = [family_head]
+
+    family_head = random.choice(potential_families)
+    player_last_name = family_head.last_name
+    player_first_name = game_state.get('player_name', 'Player')
+    game_state['player_name'] = f"{player_first_name} {player_last_name}"
+    game_state['player_class'] = player_class
+
+    # Add player to the family
+    family_head.add_family_member(game_state['player_name'], "child", random.randint(-50, 100), 1, 18)
+
+    return player_last_name
+
+def create_family_for_npc(npc, npcs):
+    # Implementation of create_family_for_npc function
+    # This would need to be implemented based on your NPC and family system
+    pass
+    
+    Summary: This file manages the game state, including generating a new game, loading an existing game, and assigning players to families within the game world.
+    
+    Relevant Functions:
+    - generate_new_game: Generates a new game including NPCs, a town map, events, and saves the initial game state.
+
+    File: game_loop.py
+    Content:
+    import asyncio
+import pygame
+import time
+from draw_game import draw_game
+from event_handler import handle_events
+from simulation import run_simulation
+from save_load_manager import save_game_state
+from database import save_npcs
+from audio_manager import update_audio_volume
+from housing_manager import get_housing_stats
+from npc_simulation import update_npc_destinations
+from player import Player, print_player_info
+from tile_types import TileType
+from draw_ui import generate_minimap_image
+
+CAMERA_INTERPOLATION_SPEED = 5  # adjust this value to change the smoothness of camera movement
+TILE_SIZE = 32  # Make sure this matches your TILE_SIZE constant
+
+# Load sound effects
+enter_sound = pygame.mixer.Sound("enter.mp3")
+exit_sound = pygame.mixer.Sound("exit.mp3")
+
+async def game_loop(game_state):
+    clock = pygame.time.Clock()
+    screen = game_state['screen']
+    
+    town_map = game_state['town_map']
+    buildings = game_state['buildings']
+    npcs = game_state['npcs']
+    
+    game_state['player'] = Player(game_state['player_position'])
+    
+    # Ensure show_minimap is set to True by default
+    game_state['show_minimap'] = True
+    
+    print(f"Starting game with {len(npcs)} NPCs")
+    print("Game started successfully")
+
+    try:
+        pygame.mixer.music.load("background.mp3")
+        pygame.mixer.music.set_volume(0.15)
+        pygame.mixer.music.play(-1)
+        print("Background music started")
+    except pygame.error as e:
+        print(f"Error loading background music: {e}")
+    
+    # Generate minimap image
+    generate_minimap_image(town_map)
+    print("Minimap image generated")
+    
+    print("Entering main game loop")
+    frame_count = 0
+    last_time = time.time()
+    running = True
+    last_speaking_npc = None
+    housing_stats_history = []
+    last_housing_stats_update = pygame.time.get_ticks()
+    npc_update_interval = 1  # Update NPCs every frame for smoother movement
+    simulation_interval = 60  # Run full simulation every second
+    
+    while running:
+        frame_start_time = time.time()
+        frame_count += 1
+        delta_time = frame_start_time - last_time
+        last_time = frame_start_time
+        
+        game_state['delta_time'] = delta_time
+        
+        try:
+            events = pygame.event.get()
+            for event in events:
+                if event.type == pygame.QUIT:
+                    running = False
+            
+            keys = pygame.key.get_pressed()
+            mouse_pos = pygame.mouse.get_pos()
+            
+            # Update player position and facing
+            game_state['player'].move(keys, town_map, delta_time)
+            game_state['player'].update(delta_time)
+            game_state['player'].update_facing(mouse_pos)
+            
+            # Check for door interaction
+            handle_door_interaction(game_state['player'], town_map, buildings)
+            
+            game_state['player_position'] = game_state['player'].position
+            game_state['player_facing'] = game_state['player'].facing
+            
+            # Update camera position with interpolation
+            target_camera_x = game_state['player'].position[0] - screen.get_width() // 2
+            target_camera_y = game_state['player'].position[1] - screen.get_height() // 2
+            
+            dx = target_camera_x - game_state['camera_x']
+            dy = target_camera_y - game_state['camera_y']
+            
+            game_state['camera_x'] += dx * CAMERA_INTERPOLATION_SPEED * delta_time
+            game_state['camera_y'] += dy * CAMERA_INTERPOLATION_SPEED * delta_time
+            
+            running = await handle_events(events, game_state, npcs, town_map)
+            
+            # Update NPC positions every frame
+            for npc in npcs:
+                npc.move(game_state['player_position'], game_state['player_facing'], town_map, len(town_map[0]), len(town_map), delta_time)
+            
+            if frame_count % simulation_interval == 0:
+                simulation_result = await run_simulation(npcs, game_state, town_map)
+                game_state.update(simulation_result)
+            
+            if last_speaking_npc:
+                update_audio_volume(last_speaking_npc.position, game_state['player'].position)
+            
+            speaking_npc = next((npc for npc in npcs if npc.interacting_with_player), None)
+            if speaking_npc:
+                last_speaking_npc = speaking_npc
+            
+            # Debug: Print NPC positions
+            # if frame_count % 60 == 0:  # Print every second
+            #     print("\nNPC Positions:")
+            #     for i, npc in enumerate(npcs[:5]):  # Print first 5 NPCs
+            #         print(f"NPC {i}: position={npc.position}, state={npc.state}")
+            #     print(f"Total NPCs: {len(npcs)}")
+            #     print(f"Player position: {game_state['player_position']}")
+            #     print(f"Camera position: ({game_state['camera_x']}, {game_state['camera_y']})")
+            
+            draw_game(screen, game_state, town_map, buildings, npcs)
+            
+            pygame.display.flip()
+            
+            if frame_count % (60 * 10) == 0:  # Update destinations every 10 seconds
+                update_npc_destinations(npcs, town_map)
+            
+            current_time = pygame.time.get_ticks()
+            if current_time - last_housing_stats_update > 60000:
+                housing_stats = get_housing_stats(npcs)
+                housing_stats_history.append(housing_stats)
+                last_housing_stats_update = current_time
+                
+                if len(housing_stats_history) > 60:
+                    housing_stats_history = housing_stats_history[-60:]
+                
+                game_state['housing_stats_history'] = housing_stats_history
+            
+            if current_time % (5 * 60 * 1000) < 100:
+                save_game_state(game_state, town_map, buildings)
+                save_npcs(npcs)
+            
+            clock.tick(60)
+            await asyncio.sleep(0)
+            
+        except Exception as e:
+            print(f"Error in game loop: {e}")
+            import traceback
+            traceback.print_exc()
+            running = False
+        
+        # if frame_count % 60 == 0:
+        #     print(f"FPS: {clock.get_fps():.2f}")
+        #     print_player_info(game_state['player'], delta_time)
+    
+    print("Exiting game loop")
+    save_game_state(game_state, town_map, buildings)
+    save_npcs(npcs)
+    print("Game state saved")
+
+def handle_door_interaction(player, town_map, buildings):
+    player_tile_x = int(player.position[0] // TILE_SIZE)
+    player_tile_y = int(player.position[1] // TILE_SIZE)
+    
+    for building in buildings:
+        if building.door_position == (player_tile_x, player_tile_y):
+            if not building.door_open:
+                building.toggle_door()
+                town_map[player_tile_y][player_tile_x] = TileType.OPEN_DOOR
+                enter_sound.play()
+                print(f"Door opened at {building.door_position}")
+        elif building.door_open and building.door_position != (player_tile_x, player_tile_y):
+            building.toggle_door()
+            door_x, door_y = building.door_position
+            town_map[door_y][door_x] = TileType.DOOR
+            exit_sound.play()
+            print(f"Door closed at {building.door_position}")
+
+# Helper functions
+
+def update_camera_position(game_state, screen_width, screen_height, delta_time):
+    target_camera_x = game_state['player'].position[0] - screen_width // 2
+    target_camera_y = game_state['player'].position[1] - screen_height // 2
+    
+    dx = target_camera_x - game_state['camera_x']
+    dy = target_camera_y - game_state['camera_y']
+    
+    game_state['camera_x'] += dx * CAMERA_INTERPOLATION_SPEED * delta_time
+    game_state['camera_y'] += dy * CAMERA_INTERPOLATION_SPEED * delta_time
+
+def update_npcs(npcs, game_state, town_map, delta_time):
+    for npc in npcs:
+        npc.move(game_state['player_position'], game_state['player_facing'], town_map, len(town_map[0]), len(town_map), delta_time)
+
+def print_debug_info(frame_count, npcs, game_state):
+    if frame_count % 60 == 0:  # Print every second
+        print("\nNPC Positions:")
+        for i, npc in enumerate(npcs[:5]):  # Print first 5 NPCs
+            print(f"NPC {i}: position={npc.position}, state={npc.state}")
+        print(f"Total NPCs: {len(npcs)}")
+        print(f"Player position: {game_state['player_position']}")
+        print(f"Camera position: ({game_state['camera_x']}, {game_state['camera_y']})")
+
+def update_housing_stats(game_state, npcs, current_time, last_housing_stats_update, housing_stats_history):
+    if current_time - last_housing_stats_update > 60000:
+        housing_stats = get_housing_stats(npcs)
+        housing_stats_history.append(housing_stats)
+        
+        if len(housing_stats_history) > 60:
+            housing_stats_history = housing_stats_history[-60:]
+        
+        game_state['housing_stats_history'] = housing_stats_history
+        return current_time, housing_stats_history
+    
+    return last_housing_stats_update, housing_stats_history
+
+def autosave(game_state, town_map, buildings, npcs, current_time):
+    if current_time % (5 * 60 * 1000) < 100:
+        save_game_state(game_state, town_map, buildings)
+        save_npcs(npcs)
+        print("Autosave completed")
+
+if __name__ == "__main__":
+    print("game_loop.py is not meant to be run directly.")
+    print("Please run main.py to start the game.")
+    
+    Summary: This file contains the main game loop and handles game state updates, player interactions, and NPC behaviors in a game built using Pygame.
+    
+    Relevant Functions:
+    - game_loop: Runs the main game loop, processing events, updating game state, handling player and NPC interactions, and managing audio and visuals.
+    
+    Please analyze the code and provide: 
+    1. An explanation of how the code relates to the query, taking into account the file structure 
+    2. Any suggested modifications to address the query, ensuring that imports and file paths are correct given the file structure 
+    3. The updated code for each file that needs changes 
+    4. Include the entire code including the import statements.
+    
+    Pay special attention to the functions identified as relevant and the file structure when suggesting imports or calls between files. 
+    
+    You are an expert software developer. You practice perfectly principled programming. You follow these rules.
+    1. Provide complete, copy-paste-ready code for all modifications.
+    2. Make only the exact changes requested by the user.
+    3. Add only features that are explicitly requested.
+    4. When updating existing code, include all unchanged parts to ensure completeness.
+    5. Maintain the existing code structure and style unless changes are specifically requested.
+    6. Ensure all imports and file paths are correct given the file structure. 
+    

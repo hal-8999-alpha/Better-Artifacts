@@ -33,7 +33,7 @@
       <div class="top-controls">
         <div class="left-controls">
           <transition name="fade">
-            <div v-if="selectedMode === 'Project'" class="update-container">
+            <div v-if="selectedMode === 'Project' || selectedMode === 'File'" class="update-container">
               <button 
                 @click="handleUpdate" 
                 :disabled="!selectedDirectory || isUpdating"
@@ -50,7 +50,7 @@
         </div>
         <div class="right-controls">
           <transition name="fade">
-            <div v-if="selectedMode === 'Project'" class="directory-selection">
+            <div v-if="selectedMode === 'Project' || selectedMode === 'File'" class="directory-selection">
               <button @click="openDirectoryDialog" class="file-button">
                 <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                   <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
@@ -113,7 +113,7 @@ const scriptFileNames = ref([]);
 const activeTab = ref(0);
 const models = ['Claude', 'GPT4o'];
 const selectedModel = ref('Claude');
-const modes = ['Code', 'Chat', 'Project'];
+const modes = ['Code', 'Chat', 'Project', 'File'];
 const selectedMode = ref('Code');
 const selectedDirectory = ref(null);
 const selectedDirectoryName = ref('');
@@ -143,7 +143,7 @@ const handleModeChange = () => {
   console.log(`Mode changed to: ${selectedMode.value}`);
   store.dispatch('setSelectedMode', selectedMode.value);
   // Reset or adjust UI elements based on the selected mode
-  if (selectedMode.value !== 'Project') {
+  if (selectedMode.value !== 'Project' && selectedMode.value !== 'File') {
     selectedDirectory.value = null;
     selectedDirectoryName.value = '';
     databaseContents.value = null;
@@ -180,6 +180,54 @@ const openDirectoryDialog = async () => {
     console.error('Error selecting directory:', error);
     selectedDirectory.value = null;
     selectedDirectoryName.value = '';
+  }
+};
+
+
+const handleFileMode = async (message) => {
+  try {
+    if (!databaseContents.value || Object.keys(databaseContents.value.files).length === 0) {
+      console.log('Database contents not available, attempting to fetch...');
+      await fetchDatabaseContents();
+      
+      if (!databaseContents.value || Object.keys(databaseContents.value.files).length === 0) {
+        throw new Error('Database contents are empty. Please ensure files are uploaded and processed correctly.');
+      }
+    }
+
+    console.log('Database contents:', databaseContents.value);
+
+    // First stage: Select relevant files and functions
+    const relevantFiles = await selectRelevantFilesAndFunctions(message, databaseContents.value);
+    console.log('Relevant files:', relevantFiles);
+
+    // Second stage: Prepare the prompt for Claude (but don't send it)
+    const result = await makeApiCall('File', selectedModel.value, {
+      query: message,
+      relevantFiles: relevantFiles.relevantFiles,
+      databaseContents: databaseContents.value
+    });
+
+    console.log('File mode result:', result);
+
+    // Ensure usage data is correctly structured
+    const usage = {
+      prompt_tokens: result.usage?.prompt_tokens || 0,
+      completion_tokens: result.usage?.completion_tokens || 0,
+      total_tokens: (result.usage?.prompt_tokens || 0) + (result.usage?.completion_tokens || 0)
+    };
+
+    return {
+      role: 'assistant',
+      content: `Prompt saved to file: ${result.filename}\n\nThe prompt has been saved in the 'prompts' folder on the server. You can find it at: server/prompts/${result.filename}`,
+      usage: usage
+    };
+  } catch (error) {
+    console.error('Error in handleFileMode:', error);
+    return {
+      role: 'assistant',
+      content: `An error occurred while processing your request: ${error.message}. Please try again or contact support if the issue persists.`
+    };
   }
 };
 
@@ -237,7 +285,7 @@ const handleUpdate = async () => {
     console.log('Sending files:', selectedDirectory.value.files.map(f => f.path));
 
     const result = await startProcess(formData);
-    console.log('startProcess result:', result);  // Add this line for debugging
+    console.log('startProcess result:', result);
 
     if (result.success) {
       console.log('Process completed successfully');
@@ -312,6 +360,9 @@ const handleSend = async (message) => {
       case 'Code':
         response = await handleCodeMode(message);
         break;
+      case 'File':
+        response = await handleFileMode(message);
+        break;
       default:
         throw new Error(`Invalid mode: ${selectedMode.value}`);
     }
@@ -325,11 +376,13 @@ const handleSend = async (message) => {
 
     // Update token count and cost
     if (response.usage) {
+      console.log('Updating tokens and cost with usage:', response.usage);
       store.dispatch('updateTokensAndCost', {
-        inputTokens: response.usage.prompt_tokens || response.usage.input_tokens || 0,
-        outputTokens: response.usage.completion_tokens || response.usage.output_tokens || 0,
-        isAssistantAPI: selectedMode.value === 'Project'
+        usage: response.usage,
+        isAssistantAPI: selectedMode.value === 'Project' || selectedMode.value === 'File'
       });
+    } else {
+      console.warn('No usage data available for token count update');
     }
 
   } catch (error) {

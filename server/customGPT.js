@@ -9,8 +9,8 @@ const openai = new OpenAI({
 
 const ASSISTANT_ID = process.env.VUE_APP_OPENAI_ASSISTANT_ID;
 
-const MAX_REQUESTS_PER_MINUTE = 50;
-const RATE_LIMIT_WINDOW = 60000; // 1 minute in milliseconds
+const MAX_REQUESTS_PER_MINUTE = 500;
+const RATE_LIMIT_WINDOW = 30000; // 1 minute in milliseconds
 let requestsThisMinute = 0;
 let windowStart = Date.now();
 

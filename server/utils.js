@@ -1,3 +1,5 @@
+const path = require('path');
+
 async function promiseAllWithConcurrency(items, fn, concurrency) {
     const results = [];
     const queue = items.slice();
@@ -17,6 +19,12 @@ async function promiseAllWithConcurrency(items, fn, concurrency) {
     return results;
 }
 
+function generateUniqueFilename(prefix, extension) {
+    const timestamp = new Date().toISOString().replace(/[-:]/g, '').replace('T', '_').split('.')[0];
+    return `${prefix}_${timestamp}.${extension}`;
+}
+
 module.exports = {
-    promiseAllWithConcurrency
+    promiseAllWithConcurrency,
+    generateUniqueFilename
 };
