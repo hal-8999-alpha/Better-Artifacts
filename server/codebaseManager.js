@@ -96,22 +96,22 @@ async function processFile(file, projectRoot) {
                     const analysisResult = await customGPT.analyzeFile(fileContent, file.relativePath);
                     await storeAnalysisResult(analysisResult, projectRoot, currentHash);
                     console.log(`Completed processing and storing file: ${file.relativePath}`);
-                    return { success: true, file: file.relativePath, usage: analysisResult.usage };
+                    return { success: true, file: file.relativePath, usage: analysisResult.usage, processed: true };
                 } catch (analysisError) {
                     console.error(`Error analyzing file ${file.relativePath}:`, analysisError);
-                    return { success: false, file: file.relativePath, error: analysisError.message };
+                    return { success: false, file: file.relativePath, error: analysisError.message, processed: true };
                 }
             } else {
                 console.log(`File ${file.relativePath} unchanged, skipping...`);
-                return { success: true, file: file.relativePath, skipped: true };
+                return { success: true, file: file.relativePath, skipped: true, processed: false };
             }
         } else {
             console.log(`Skipped file: ${file.relativePath} due to read error`);
-            return { success: false, file: file.relativePath, error: 'Read error' };
+            return { success: false, file: file.relativePath, error: 'Read error', processed: false };
         }
     } catch (error) {
         console.error(`Error processing file ${file.relativePath}:`, error);
-        return { success: false, file: file.relativePath, error: error.message };
+        return { success: false, file: file.relativePath, error: error.message, processed: false };
     }
 }
 
@@ -124,7 +124,7 @@ async function startProcess(files, projectRoot, ignoredPaths) {
         console.log('Database initialized');
 
         const { default: PQueue } = await import('p-queue');
-        const queue = new PQueue({concurrency: 5}); // Reduced concurrency to avoid overwhelming the API
+        const queue = new PQueue({concurrency: 5});
 
         const results = await Promise.all(files.map(file => queue.add(() => processFile(file, projectRoot))));
 
@@ -132,15 +132,15 @@ async function startProcess(files, projectRoot, ignoredPaths) {
         const tree = await generateFunctionCallTree(projectRoot);
         await db.put('functionCallTree', tree);
 
-        const successCount = results.filter(r => r.success).length;
-        const failureCount = results.filter(r => !r.success).length;
+        const successCount = results.filter(r => r.success && r.processed).length;
+        const failureCount = results.filter(r => !r.success && r.processed).length;
         const skippedCount = results.filter(r => r.skipped).length;
 
         console.log(`Process completed. Successful: ${successCount}, Failed: ${failureCount}, Skipped: ${skippedCount}`);
         
-        // Calculate total usage
+        // Calculate total usage only for processed files
         const totalUsage = results.reduce((acc, result) => {
-            if (result.usage) {
+            if (result.processed && result.usage) {
                 acc.prompt_tokens += result.usage.prompt_tokens || 0;
                 acc.completion_tokens += result.usage.completion_tokens || 0;
                 acc.total_tokens += result.usage.total_tokens || 0;
@@ -153,7 +153,9 @@ async function startProcess(files, projectRoot, ignoredPaths) {
         return {
             success: failureCount === 0,
             results: results,
-            usage: totalUsage
+            usage: totalUsage,
+            processedCount: successCount + failureCount,
+            skippedCount: skippedCount
         };
     } catch (error) {
         console.error('Error in startProcess:', error);

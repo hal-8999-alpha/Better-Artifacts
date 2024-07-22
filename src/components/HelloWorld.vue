@@ -237,34 +237,26 @@ const handleUpdate = async () => {
     console.log('Sending files:', selectedDirectory.value.files.map(f => f.path));
 
     const result = await startProcess(formData);
+    console.log('startProcess result:', result);  // Add this line for debugging
+
     if (result.success) {
-      console.log(result.message);
+      console.log('Process completed successfully');
       lastUpdateTime.value = formatDate(new Date());
       await fetchDatabaseContents();
       
-      // Update token count
-      let totalInputTokens = 0;
-      let totalOutputTokens = 0;
+      // Update token count only if files were processed
+      if (result.processedCount > 0) {
+        store.dispatch('updateTokensAndCost', {
+          usage: result.usage,
+          isAssistantAPI: true
+        });
+      }
       
-      // Sum up tokens from all files
-      Object.values(databaseContents.value.files).forEach(file => {
-        if (file.usage) {
-          totalInputTokens += file.usage.prompt_tokens || 0;
-          totalOutputTokens += file.usage.completion_tokens || 0;
-        }
-      });
-      
-      // Dispatch the token update to the store
-      store.dispatch('updateTokensAndCost', {
-        inputTokens: totalInputTokens,
-        outputTokens: totalOutputTokens,
-        isAssistantAPI: true
-      });
-      
-      console.log(`Updated token count - Input: ${totalInputTokens}, Output: ${totalOutputTokens}`);
+      console.log(`Updated token count - Input: ${result.usage.prompt_tokens}, Output: ${result.usage.completion_tokens}`);
+      console.log(`Files processed: ${result.processedCount}, Files skipped: ${result.skippedCount}`);
     } else {
-      console.error(result.message);
-      throw new Error(result.message);
+      console.error('Process failed:', result.error);
+      throw new Error(result.error);
     }
   } catch (error) {
     console.error('Error during update:', error);

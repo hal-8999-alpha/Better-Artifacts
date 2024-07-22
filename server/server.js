@@ -326,8 +326,12 @@ setupEnvFile().then(() => {
         console.log('codebaseManager.startProcess result:', result);
         
         res.status(200).json({ 
-          message: result ? 'Process completed successfully' : 'Process failed',
-          success: result
+          success: result.success,
+          processedCount: result.processedCount,
+          skippedCount: result.skippedCount,
+          usage: result.usage,
+          results: result.results,
+          error: result.error
         });
     
       } catch (error) {

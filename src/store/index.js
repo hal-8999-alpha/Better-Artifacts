@@ -40,8 +40,8 @@ export default createStore({
     },
     UPDATE_ASSISTANT_TOKENS(state, { inputTokens, outputTokens }) {
       console.log('UPDATE_ASSISTANT_TOKENS mutation called', inputTokens, outputTokens);
-      state.totalAssistantInputTokens += inputTokens;
-      state.totalAssistantOutputTokens += outputTokens;
+      state.totalAssistantInputTokens = inputTokens;
+      state.totalAssistantOutputTokens = outputTokens;
     },
     UPDATE_COST(state, cost) {
       console.log('UPDATE_COST mutation called', cost);
@@ -63,17 +63,19 @@ export default createStore({
     }
   },
   actions: {
-    updateTokensAndCost({ commit, state }, { inputTokens, outputTokens, isAssistantAPI = false }) {
-      console.log('updateTokensAndCost action called', {
-        inputTokens,
-        outputTokens,
-        isAssistantAPI
-      });
+    updateTokensAndCost({ commit, state }, { usage, isAssistantAPI = false }) {
+      console.log('updateTokensAndCost action called', { usage, isAssistantAPI });
       
       if (isAssistantAPI) {
-        commit('UPDATE_ASSISTANT_TOKENS', { inputTokens, outputTokens });
+        commit('UPDATE_ASSISTANT_TOKENS', { 
+          inputTokens: usage.prompt_tokens, 
+          outputTokens: usage.completion_tokens 
+        });
       } else {
-        commit('UPDATE_TOKENS', { inputTokens, outputTokens });
+        commit('UPDATE_TOKENS', { 
+          inputTokens: usage.prompt_tokens, 
+          outputTokens: usage.completion_tokens 
+        });
       }
       
       const claudeInputCost = (state.totalInputTokens / 1000) * 0.015;
