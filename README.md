@@ -132,3 +132,6 @@ Now when you ask a question, Claude 3.5 Sonnet will be given:
 4. Add one-click unit testing that writes tests for every script/function in your codebase and runs them in a sandbox
 5. Implement with an Agent framework(s) to make ourselves obsolete
 6. Give it Scarlett Johansson's voice and then pretend that we totally didn't think that people would think it's weird
+
+## UPDATES
+7/22/24 - Added a File option as a temporary workaround and to help save on cost. File will take a large project (that doesn't work with the Claude API right now) and spit out a massive prompt. The prompt can be passed into Claude or GPT4o directly giving the LLM all of the needed context without being confused by your whole project. Tests work great. I took a 130 file project and passed in the correct 3-5 files based on their graph relations each time. The interface for this isn't pretty right now but it will be soon. Use this on large projects that get errors from the Claude API or because you have a pro membership and think you can save money. 
