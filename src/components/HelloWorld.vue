@@ -358,6 +358,17 @@ const handleProjectMode = async (message) => {
     const relevantFiles = await selectRelevantFilesAndFunctions(message, databaseContents.value);
     console.log('Relevant files:', relevantFiles);
 
+    // Update token count for file selection (Assistant API)
+    if (relevantFiles.usage) {
+      store.dispatch('updateTokensAndCost', {
+        usage: {
+          prompt_tokens: relevantFiles.usage.prompt_tokens,
+          completion_tokens: relevantFiles.usage.completion_tokens
+        },
+        isAssistantAPI: true
+      });
+    }
+
     // Second stage: Analyze and modify code
     const result = await analyzeAndModifyCode(message, relevantFiles.relevantFiles, databaseContents.value);
     console.log('Analysis result:', result);
@@ -367,6 +378,17 @@ const handleProjectMode = async (message) => {
     }
     
     analysisResult.value = result;
+
+    // Update token count for code analysis (Claude API)
+    if (result.usage) {
+      store.dispatch('updateTokensAndCost', {
+        usage: {
+          prompt_tokens: result.usage.input_tokens,
+          completion_tokens: result.usage.output_tokens
+        },
+        isAssistantAPI: false
+      });
+    }
 
     // Helper function to get the file name from a path
     const getFileName = (filePath) => {
@@ -408,7 +430,6 @@ To see the updated code, please check the code display panel.
       role: 'assistant', 
       content: formattedResponse,
       codeScripts: codeScripts.value,
-      usage: result.usage // Assuming the result includes usage information
     };
   } catch (error) {
     console.error('Error in handleProjectMode:', error);

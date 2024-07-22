@@ -40,8 +40,8 @@ export default createStore({
     },
     UPDATE_ASSISTANT_TOKENS(state, { inputTokens, outputTokens }) {
       console.log('UPDATE_ASSISTANT_TOKENS mutation called', inputTokens, outputTokens);
-      state.totalAssistantInputTokens = inputTokens;
-      state.totalAssistantOutputTokens = outputTokens;
+      state.totalAssistantInputTokens += inputTokens;
+      state.totalAssistantOutputTokens += outputTokens;
     },
     UPDATE_COST(state, cost) {
       console.log('UPDATE_COST mutation called', cost);
@@ -63,7 +63,7 @@ export default createStore({
     }
   },
   actions: {
-    updateTokensAndCost({ commit, state }, { usage, isAssistantAPI = false }) {
+    updateTokensAndCost({ commit, state }, { usage, isAssistantAPI }) {
       console.log('updateTokensAndCost action called', { usage, isAssistantAPI });
       
       if (isAssistantAPI) {

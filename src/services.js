@@ -156,7 +156,7 @@ const selectRelevantFilesAndFunctions = async (query, databaseContents) => {
       query,
       databaseContents
     });
-    return response.data;
+    return response.data;  // This should already include the usage information
   } catch (error) {
     console.error('Error selecting relevant files and functions:', error);
     throw error;
@@ -170,7 +170,7 @@ const analyzeAndModifyCode = async (query, selectedFiles, databaseContents) => {
       selectedFiles,
       databaseContents
     });
-    return response.data;
+    return response.data;  // This should already include the usage information
   } catch (error) {
     console.error('Error analyzing and modifying code:', error);
     throw error;
