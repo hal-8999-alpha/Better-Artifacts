@@ -458,44 +458,53 @@ setupEnvFile().then(() => {
 
   app.post('/api/save-api-keys', async (req, res) => {
     try {
-      const { claudeApiKey, openaiApiKey } = req.body;
+      const { claudeApiKey, openaiApiKey, openaiAssistantId } = req.body;
   
-      if (!claudeApiKey && !openaiApiKey) {
-        return res.status(400).json({ error: 'At least one API key must be provided' });
+      if (!claudeApiKey && !openaiApiKey && !openaiAssistantId) {
+        return res.status(400).json({ error: 'At least one API key or Assistant ID must be provided' });
       }
   
       const envPath = path.resolve(__dirname, '.env');
-    let envContent = await fs.readFile(envPath, 'utf8');
-
-    if (claudeApiKey) {
-      const claudeKeyRegex = /VUE_APP_ANTHROPIC_API_KEY=.*/;
-      if (claudeKeyRegex.test(envContent)) {
-        envContent = envContent.replace(claudeKeyRegex, `VUE_APP_ANTHROPIC_API_KEY=${claudeApiKey}`);
-      } else {
-        envContent += `\nVUE_APP_ANTHROPIC_API_KEY=${claudeApiKey}`;
+      let envContent = await fs.readFile(envPath, 'utf8');
+  
+      if (claudeApiKey) {
+        const claudeKeyRegex = /VUE_APP_ANTHROPIC_API_KEY=.*/;
+        if (claudeKeyRegex.test(envContent)) {
+          envContent = envContent.replace(claudeKeyRegex, `VUE_APP_ANTHROPIC_API_KEY=${claudeApiKey}`);
+        } else {
+          envContent += `\nVUE_APP_ANTHROPIC_API_KEY=${claudeApiKey}`;
+        }
       }
-    }
-
-    if (openaiApiKey) {
-      const openaiKeyRegex = /VUE_APP_OPENAI_API_KEY=.*/;
-      if (openaiKeyRegex.test(envContent)) {
-        envContent = envContent.replace(openaiKeyRegex, `VUE_APP_OPENAI_API_KEY=${openaiApiKey}`);
-      } else {
-        envContent += `\nVUE_APP_OPENAI_API_KEY=${openaiApiKey}`;
+  
+      if (openaiApiKey) {
+        const openaiKeyRegex = /VUE_APP_OPENAI_API_KEY=.*/;
+        if (openaiKeyRegex.test(envContent)) {
+          envContent = envContent.replace(openaiKeyRegex, `VUE_APP_OPENAI_API_KEY=${openaiApiKey}`);
+        } else {
+          envContent += `\nVUE_APP_OPENAI_API_KEY=${openaiApiKey}`;
+        }
       }
+  
+      if (openaiAssistantId) {
+        const assistantIdRegex = /VUE_APP_OPENAI_ASSISTANT_ID=.*/;
+        if (assistantIdRegex.test(envContent)) {
+          envContent = envContent.replace(assistantIdRegex, `VUE_APP_OPENAI_ASSISTANT_ID=${openaiAssistantId}`);
+        } else {
+          envContent += `\nVUE_APP_OPENAI_ASSISTANT_ID=${openaiAssistantId}`;
+        }
+      }
+  
+      await fs.writeFile(envPath, envContent);
+  
+      // Refresh environment variables
+      require('dotenv').config();
+  
+      res.json({ message: 'API keys and Assistant ID saved successfully' });
+    } catch (error) {
+      console.error('Error saving API keys:', error);
+      res.status(500).json({ error: 'Failed to save API keys' });
     }
-
-    await fs.writeFile(envPath, envContent);
-
-    // Refresh environment variables
-    require('dotenv').config();
-
-    res.json({ message: 'API keys saved successfully' });
-  } catch (error) {
-    console.error('Error saving API keys:', error);
-    res.status(500).json({ error: 'Failed to save API keys' });
-  }
-});
+  });
 
 function startServer(port) {
 app.listen(port, () => {
@@ -516,7 +525,8 @@ app.listen(port, () => {
 app.get('/api/get-api-keys', (req, res) => {
   res.json({
     claudeApiKey: process.env.VUE_APP_ANTHROPIC_API_KEY || 'No Key',
-    openaiApiKey: process.env.VUE_APP_OPENAI_API_KEY || ''
+    openaiApiKey: process.env.VUE_APP_OPENAI_API_KEY || '',
+    openaiAssistantId: process.env.VUE_APP_OPENAI_ASSISTANT_ID || ''
   });
 });
 

@@ -1,105 +1,127 @@
 <template>
-    <transition name="modal">
-      <div v-if="show" class="modal-overlay" @click="closeModal">
-        <div class="modal-content" @click.stop>
-          <button @click="closeModal" class="close-button">&times;</button>
-          <h2>API Keys</h2>
-          <div v-if="error" class="error-message">{{ error }}</div>
-          <div v-if="success" class="success-message">{{ success }}</div>
-          <div class="input-group">
-            <label for="claude-api-key">Claude API Key:</label>
-            <div class="input-with-toggle">
-              <input 
-                :type="showClaudeKey ? 'text' : 'password'" 
-                id="claude-api-key" 
-                v-model="claudeApiKey" 
-                placeholder="Enter Claude API Key"
-              >
-              <button @click="toggleClaudeKeyVisibility" class="toggle-visibility">
-                {{ showClaudeKey ? 'Hide' : 'Show' }}
-              </button>
-            </div>
+  <transition name="modal">
+    <div v-if="show" class="modal-overlay" @click="closeModal">
+      <div class="modal-content" @click.stop>
+        <button @click="closeModal" class="close-button">&times;</button>
+        <h2>API Keys</h2>
+        <div v-if="error" class="error-message">{{ error }}</div>
+        <div v-if="success" class="success-message">{{ success }}</div>
+        <div class="input-group">
+          <label for="claude-api-key">Claude API Key:</label>
+          <div class="input-with-toggle">
+            <input 
+              :type="showClaudeKey ? 'text' : 'password'" 
+              id="claude-api-key" 
+              v-model="claudeApiKey" 
+              placeholder="Enter Claude API Key"
+            >
+            <button @click="toggleClaudeKeyVisibility" class="toggle-visibility">
+              {{ showClaudeKey ? 'Hide' : 'Show' }}
+            </button>
           </div>
-          <div class="input-group">
-            <label for="openai-api-key">OpenAI API Key:</label>
-            <div class="input-with-toggle">
-              <input 
-                :type="showOpenAIKey ? 'text' : 'password'" 
-                id="openai-api-key" 
-                v-model="openaiApiKey" 
-                placeholder="Enter OpenAI API Key"
-              >
-              <button @click="toggleOpenAIKeyVisibility" class="toggle-visibility">
-                {{ showOpenAIKey ? 'Hide' : 'Show' }}
-              </button>
-            </div>
-          </div>
-          <button @click="saveKeys" class="save-button">Save Keys</button>
         </div>
+        <div class="input-group">
+          <label for="openai-api-key">OpenAI API Key:</label>
+          <div class="input-with-toggle">
+            <input 
+              :type="showOpenAIKey ? 'text' : 'password'" 
+              id="openai-api-key" 
+              v-model="openaiApiKey" 
+              placeholder="Enter OpenAI API Key"
+            >
+            <button @click="toggleOpenAIKeyVisibility" class="toggle-visibility">
+              {{ showOpenAIKey ? 'Hide' : 'Show' }}
+            </button>
+          </div>
+        </div>
+        <div class="input-group">
+          <label for="openai-assistant-id">OpenAI Assistant ID:</label>
+          <div class="input-with-toggle">
+            <input 
+              :type="showAssistantId ? 'text' : 'password'" 
+              id="openai-assistant-id" 
+              v-model="openaiAssistantId" 
+              placeholder="Enter OpenAI Assistant ID"
+            >
+            <button @click="toggleAssistantIdVisibility" class="toggle-visibility">
+              {{ showAssistantId ? 'Hide' : 'Show' }}
+            </button>
+          </div>
+        </div>
+        <button @click="saveKeys" class="save-button">Save Keys</button>
       </div>
-    </transition>
-  </template>
-  
-  <script setup>
-  import { ref, onMounted } from 'vue';
-  import { saveApiKeys, getApiKeys } from '../services';
-  
-  const props = defineProps({
-    show: Boolean
-  });
-  
-  const emit = defineEmits(['close']);
-  
-  const claudeApiKey = ref('');
-  const openaiApiKey = ref('');
-  const showClaudeKey = ref(false);
-  const showOpenAIKey = ref(false);
-  const error = ref('');
-  const success = ref('');
-  
-  const closeModal = () => {
-    emit('close');
-  };
-  
-  const toggleClaudeKeyVisibility = () => {
-    showClaudeKey.value = !showClaudeKey.value;
-  };
-  
-  const toggleOpenAIKeyVisibility = () => {
-    showOpenAIKey.value = !showOpenAIKey.value;
-  };
-  
-  const saveKeys = async () => {
-    try {
-      await saveApiKeys({
-        claudeApiKey: claudeApiKey.value,
-        openaiApiKey: openaiApiKey.value
-      });
-      success.value = 'API keys saved successfully!';
-      error.value = '';
-    } catch (err) {
-      console.error('Error saving API keys:', err);
-      error.value = 'Failed to save API keys. Please try again.';
-      success.value = '';
-    }
-  };
-  
-  const loadKeys = async () => {
-    try {
-      const keys = await getApiKeys();
-      claudeApiKey.value = keys.claudeApiKey;
-      openaiApiKey.value = keys.openaiApiKey;
-      error.value = '';
-      success.value = '';
-    } catch (err) {
-      console.error('Error loading API keys:', err);
-      error.value = 'Failed to load API keys. Please try again.';
-      success.value = '';
-    }
-  };
-  
-  onMounted(loadKeys);
-  </script>
+    </div>
+  </transition>
+</template>
+
+<script setup>
+import { ref, onMounted } from 'vue';
+import { saveApiKeys, getApiKeys } from '../services';
+
+const props = defineProps({
+  show: Boolean
+});
+
+const emit = defineEmits(['close']);
+
+const claudeApiKey = ref('');
+const openaiApiKey = ref('');
+const openaiAssistantId = ref('');
+const showClaudeKey = ref(false);
+const showOpenAIKey = ref(false);
+const showAssistantId = ref(false);
+const error = ref('');
+const success = ref('');
+
+const closeModal = () => {
+  emit('close');
+};
+
+const toggleClaudeKeyVisibility = () => {
+  showClaudeKey.value = !showClaudeKey.value;
+};
+
+const toggleOpenAIKeyVisibility = () => {
+  showOpenAIKey.value = !showOpenAIKey.value;
+};
+
+const toggleAssistantIdVisibility = () => {
+  showAssistantId.value = !showAssistantId.value;
+};
+
+const saveKeys = async () => {
+  try {
+    await saveApiKeys({
+      claudeApiKey: claudeApiKey.value,
+      openaiApiKey: openaiApiKey.value,
+      openaiAssistantId: openaiAssistantId.value
+    });
+    success.value = 'API keys and Assistant ID saved successfully!';
+    error.value = '';
+  } catch (err) {
+    console.error('Error saving API keys:', err);
+    error.value = 'Failed to save API keys. Please try again.';
+    success.value = '';
+  }
+};
+
+const loadKeys = async () => {
+  try {
+    const keys = await getApiKeys();
+    claudeApiKey.value = keys.claudeApiKey;
+    openaiApiKey.value = keys.openaiApiKey;
+    openaiAssistantId.value = keys.openaiAssistantId;
+    error.value = '';
+    success.value = '';
+  } catch (err) {
+    console.error('Error loading API keys:', err);
+    error.value = 'Failed to load API keys. Please try again.';
+    success.value = '';
+  }
+};
+
+onMounted(loadKeys);
+</script>
   
   <style scoped>
   .modal-overlay {

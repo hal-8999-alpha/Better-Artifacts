@@ -1,5 +1,3 @@
-// envSetup.js
-
 const fs = require('fs').promises;
 const path = require('path');
 
@@ -14,6 +12,7 @@ async function setupEnvFile() {
       const defaultEnvContent = `
 VUE_APP_OPENAI_API_KEY=your_openai_api_key_here
 VUE_APP_ANTHROPIC_API_KEY=your_anthropic_api_key_here
+VUE_APP_OPENAI_ASSISTANT_ID=your_openai_assistant_id_here
 PORT=3000
 `;
       
