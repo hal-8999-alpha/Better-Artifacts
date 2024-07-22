@@ -7,6 +7,21 @@ const crypto = require('crypto');
 let db;
 const DB_PATH = path.join(__dirname, 'codebase-db');
 
+// Rate limit constants
+const RPM_LIMIT = 5000;
+const TPM_LIMIT = 80000;
+
+// Tracking for rate limits
+let requestsThisMinute = 0;
+let tokensThisMinute = 0;
+let lastResetTime = Date.now();
+
+function resetRateLimitTracking() {
+    requestsThisMinute = 0;
+    tokensThisMinute = 0;
+    lastResetTime = Date.now();
+}
+
 async function ensureDatabaseDirectory() {
     try {
         await fs.access(DB_PATH);
@@ -62,6 +77,35 @@ async function calculateFileHash(filePath) {
     }
 }
 
+async function processFile(file, projectRoot) {
+    console.log(`Processing file: ${file.relativePath}`);
+    const fileContent = await readFile(file.absolutePath);
+
+    if (fileContent !== null) {
+        const currentHash = await calculateFileHash(file.absolutePath);
+        const storedHash = await getStoredHash(file.relativePath);
+
+        console.log(`File: ${file.relativePath}`);
+        console.log(`Current hash: ${currentHash}`);
+        console.log(`Stored hash: ${storedHash}`);
+
+        if (currentHash !== storedHash) {
+            console.log(`File ${file.relativePath} has changed, processing...`);
+            try {
+                const analysisResult = await analyzeFile(file.relativePath, fileContent);
+                await storeAnalysisResult(analysisResult, projectRoot, currentHash);
+                console.log(`Completed processing and storing file: ${file.relativePath}`);
+            } catch (analysisError) {
+                console.error(`Error analyzing file ${file.relativePath}:`, analysisError);
+            }
+        } else {
+            console.log(`File ${file.relativePath} unchanged, skipping...`);
+        }
+    } else {
+        console.log(`Skipped file: ${file.relativePath} due to read error`);
+    }
+}
+
 async function startProcess(files, projectRoot, ignoredPaths) {
     console.log(`Starting process for ${files.length} files`);
     console.log('Project root:', projectRoot);
@@ -70,38 +114,33 @@ async function startProcess(files, projectRoot, ignoredPaths) {
         await openDatabase();
         console.log('Database initialized');
 
-        for (const file of files) {
-            try {
-                console.log(`Processing file: ${file.relativePath}`);
-                const fileContent = await readFile(file.absolutePath);
+        const { default: PQueue } = await import('p-queue');
+        const queue = new PQueue({concurrency: 50}); // Adjust concurrency as needed
 
-                if (fileContent !== null) {
-                    const currentHash = await calculateFileHash(file.absolutePath);
-                    const storedHash = await getStoredHash(file.relativePath);
-
-                    console.log(`File: ${file.relativePath}`);
-                    console.log(`Current hash: ${currentHash}`);
-                    console.log(`Stored hash: ${storedHash}`);
-
-                    if (currentHash !== storedHash) {
-                        console.log(`File ${file.relativePath} has changed, processing...`);
-                        try {
-                            const analysisResult = await analyzeFile(file.relativePath, fileContent);
-                            await storeAnalysisResult(analysisResult, projectRoot, currentHash);
-                            console.log(`Completed processing and storing file: ${file.relativePath}`);
-                        } catch (analysisError) {
-                            console.error(`Error analyzing file ${file.relativePath}:`, analysisError);
-                        }
-                    } else {
-                        console.log(`File ${file.relativePath} unchanged, skipping...`);
-                    }
-                } else {
-                    console.log(`Skipped file: ${file.relativePath} due to read error`);
-                }
-            } catch (fileError) {
-                console.error(`Error processing file ${file.relativePath}:`, fileError);
+        const processFileWithRateLimit = async (file) => {
+            // Check if we need to reset rate limit tracking
+            if (Date.now() - lastResetTime >= 60000) {
+                resetRateLimitTracking();
             }
-        }
+
+            // Check if we're within rate limits
+            if (requestsThisMinute >= RPM_LIMIT || tokensThisMinute >= TPM_LIMIT) {
+                const delay = 60000 - (Date.now() - lastResetTime);
+                await new Promise(resolve => setTimeout(resolve, delay));
+                resetRateLimitTracking();
+            }
+
+            // Process the file
+            await processFile(file, projectRoot);
+
+            // Update rate limit tracking
+            requestsThisMinute++;
+            // Estimate token usage (you may need to adjust this based on your actual usage)
+            tokensThisMinute += file.relativePath.length * 2; // Rough estimate
+        };
+
+        // Queue all file processing tasks
+        await Promise.all(files.map(file => queue.add(() => processFileWithRateLimit(file))));
 
         console.log('Generating function call tree...');
         const tree = await generateFunctionCallTree(projectRoot);
