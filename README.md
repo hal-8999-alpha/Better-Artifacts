@@ -2,6 +2,10 @@
 GPT4o mini + Claude 3.5 Sonnet for Large Projects
 (Vue 3 and Node.js)
 
+## Compatibility
+- Chrome, Edge, Opera (Web File System Access API) 
+- Tested on Windows (Should work on all systems)
+
 ## TL;DR
 Claude's Artifacts is great but is lacking with large projects. This repo uses a similar artifacts system with multiple models including Claude 3.5 Sonnet and GPT4o mini to have much better command over your project and still get all the benefits of using frontier models.
 
