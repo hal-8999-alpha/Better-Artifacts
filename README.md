@@ -3,7 +3,7 @@ GPT4o mini + Claude 3.5 Sonnet for Large Projects
 (Vue 3 and Node.js)
 
 ## TL;DR
-Claude's Artifacts is great but is lacking with large projects. This project uses a similar artifacts system with multiple models including Claude 3.5 Sonnet and GPT4o mini to have much better command over your project and still get all the benefits of using frontier models.
+Claude's Artifacts is great but is lacking with large projects. This repo uses a similar artifacts system with multiple models including Claude 3.5 Sonnet and GPT4o mini to have much better command over your project and still get all the benefits of using frontier models.
 
 ## WHAT IS IT?
 
@@ -20,6 +20,7 @@ Claude 3.5 Sonnet is excellent at writing code. The issue is that, despite its l
 ## SOLUTION
 
 - Use GPT4o mini as a cheap, high intelligence semantic router
+- Use GPT4o mini to fully enrich the codebase with metadata
 - Give Claude 3.5 Sonnet lean, high quality context and clear redundant directions
 
 This project does not include a conversation log because it's not needed. The longer a conversation goes the lower quality the context becomes. Each request you send to Claude will have exactly the code Claude needs to see and precise instructions on what needs to be achieved.
@@ -100,6 +101,7 @@ This is the main feature of this app. Before you begin:
    - A summary of each script
    - A list of imports for each script
    - A list of function names for each script
+   - A summary of what each function does
    - A list of functions that each function calls
 
 Now when you ask a question, Claude 3.5 Sonnet will be given:
