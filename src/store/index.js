@@ -4,14 +4,22 @@ export default createStore({
   state: {
     totalInputTokens: 0,
     totalOutputTokens: 0,
+    totalAssistantInputTokens: 0,
+    totalAssistantOutputTokens: 0,
     totalCost: 0,
     selectedFiles: [],
-    selectedMode: 'Code' // Add this line to track the selected mode
+    selectedMode: 'Code'
   },
   getters: {
     getTotalTokens: (state) => {
-      console.log('getTotalTokens called', state.totalInputTokens, state.totalOutputTokens);
-      return state.totalInputTokens + state.totalOutputTokens;
+      console.log('getTotalTokens called', {
+        inputTokens: state.totalInputTokens,
+        outputTokens: state.totalOutputTokens,
+        assistantInputTokens: state.totalAssistantInputTokens,
+        assistantOutputTokens: state.totalAssistantOutputTokens
+      });
+      return state.totalInputTokens + state.totalOutputTokens + 
+             state.totalAssistantInputTokens + state.totalAssistantOutputTokens;
     },
     getFormattedCost: (state) => {
       console.log('getFormattedCost called', state.totalCost);
@@ -20,7 +28,7 @@ export default createStore({
     getSelectedFiles: (state) => {
       return state.selectedFiles;
     },
-    getSelectedMode: (state) => { // Add this getter
+    getSelectedMode: (state) => {
       return state.selectedMode;
     }
   },
@@ -30,6 +38,11 @@ export default createStore({
       state.totalInputTokens += inputTokens;
       state.totalOutputTokens += outputTokens;
     },
+    UPDATE_ASSISTANT_TOKENS(state, { inputTokens, outputTokens }) {
+      console.log('UPDATE_ASSISTANT_TOKENS mutation called', inputTokens, outputTokens);
+      state.totalAssistantInputTokens += inputTokens;
+      state.totalAssistantOutputTokens += outputTokens;
+    },
     UPDATE_COST(state, cost) {
       console.log('UPDATE_COST mutation called', cost);
       state.totalCost = cost;
@@ -37,26 +50,57 @@ export default createStore({
     SET_SELECTED_FILES(state, files) {
       state.selectedFiles = files;
     },
-    SET_SELECTED_MODE(state, mode) { // Add this mutation
+    SET_SELECTED_MODE(state, mode) {
       state.selectedMode = mode;
+    },
+    RESET_TOKENS(state) {
+      console.log('RESET_TOKENS mutation called');
+      state.totalInputTokens = 0;
+      state.totalOutputTokens = 0;
+      state.totalAssistantInputTokens = 0;
+      state.totalAssistantOutputTokens = 0;
+      state.totalCost = 0;
     }
   },
   actions: {
-    updateTokensAndCost({ commit, state }, { inputTokens, outputTokens }) {
-      console.log('updateTokensAndCost action called', inputTokens, outputTokens);
-      commit('UPDATE_TOKENS', { inputTokens, outputTokens });
+    updateTokensAndCost({ commit, state }, { inputTokens, outputTokens, isAssistantAPI = false }) {
+      console.log('updateTokensAndCost action called', {
+        inputTokens,
+        outputTokens,
+        isAssistantAPI
+      });
       
-      const inputCost = (state.totalInputTokens / 1000000) * 3;
-      const outputCost = (state.totalOutputTokens / 1000000) * 15;
-      const totalCost = inputCost + outputCost;
+      if (isAssistantAPI) {
+        commit('UPDATE_ASSISTANT_TOKENS', { inputTokens, outputTokens });
+      } else {
+        commit('UPDATE_TOKENS', { inputTokens, outputTokens });
+      }
+      
+      const claudeInputCost = (state.totalInputTokens / 1000) * 0.015;
+      const claudeOutputCost = (state.totalOutputTokens / 1000) * 0.075;
+      const assistantInputCost = (state.totalAssistantInputTokens / 1000000) * 0.150;
+      const assistantOutputCost = (state.totalAssistantOutputTokens / 1000000) * 0.600;
+      
+      const totalCost = claudeInputCost + claudeOutputCost + assistantInputCost + assistantOutputCost;
       
       commit('UPDATE_COST', totalCost);
+
+      console.log('Updated token counts:', {
+        claudeInput: state.totalInputTokens,
+        claudeOutput: state.totalOutputTokens,
+        assistantInput: state.totalAssistantInputTokens,
+        assistantOutput: state.totalAssistantOutputTokens
+      });
+      console.log('Updated total cost:', totalCost);
     },
     setSelectedFiles({ commit }, files) {
       commit('SET_SELECTED_FILES', files);
     },
-    setSelectedMode({ commit }, mode) { // Add this action
+    setSelectedMode({ commit }, mode) {
       commit('SET_SELECTED_MODE', mode);
+    },
+    resetTokens({ commit }) {
+      commit('RESET_TOKENS');
     }
   },
   modules: {

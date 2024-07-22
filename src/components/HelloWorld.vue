@@ -241,6 +241,27 @@ const handleUpdate = async () => {
       console.log(result.message);
       lastUpdateTime.value = formatDate(new Date());
       await fetchDatabaseContents();
+      
+      // Update token count
+      let totalInputTokens = 0;
+      let totalOutputTokens = 0;
+      
+      // Sum up tokens from all files
+      Object.values(databaseContents.value.files).forEach(file => {
+        if (file.usage) {
+          totalInputTokens += file.usage.prompt_tokens || 0;
+          totalOutputTokens += file.usage.completion_tokens || 0;
+        }
+      });
+      
+      // Dispatch the token update to the store
+      store.dispatch('updateTokensAndCost', {
+        inputTokens: totalInputTokens,
+        outputTokens: totalOutputTokens,
+        isAssistantAPI: true
+      });
+      
+      console.log(`Updated token count - Input: ${totalInputTokens}, Output: ${totalOutputTokens}`);
     } else {
       console.error(result.message);
       throw new Error(result.message);
@@ -310,11 +331,12 @@ const handleSend = async (message) => {
       activeTab.value = 0;
     }
 
-    // Update token count and cost (you may need to adjust this based on the actual response structure)
+    // Update token count and cost
     if (response.usage) {
       store.dispatch('updateTokensAndCost', {
-        inputTokens: response.usage.input_tokens,
-        outputTokens: response.usage.output_tokens
+        inputTokens: response.usage.prompt_tokens || response.usage.input_tokens || 0,
+        outputTokens: response.usage.completion_tokens || response.usage.output_tokens || 0,
+        isAssistantAPI: selectedMode.value === 'Project'
       });
     }
 
@@ -405,9 +427,10 @@ To see the updated code, please check the code display panel.
   }
 };
 
+
 const handleChatMode = async (message) => {
   const response = await makeApiCall(selectedMode.value, selectedModel.value, message);
-  console.log('Chat mode response:', response); // Add this line for debugging
+  console.log('Chat mode response:', response);
   return {
     role: 'assistant',
     content: response.conversation || response.content || "No response content",

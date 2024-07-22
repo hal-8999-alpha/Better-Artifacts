@@ -9,6 +9,29 @@ const openai = new OpenAI({
 
 const ASSISTANT_ID = process.env.VUE_APP_OPENAI_ASSISTANT_ID;
 
+const MAX_REQUESTS_PER_MINUTE = 50;
+const RATE_LIMIT_WINDOW = 60000; // 1 minute in milliseconds
+let requestsThisMinute = 0;
+let windowStart = Date.now();
+
+async function rateLimitedApiCall(apiCallFn) {
+  const now = Date.now();
+  if (now - windowStart > RATE_LIMIT_WINDOW) {
+    requestsThisMinute = 0;
+    windowStart = now;
+  }
+
+  if (requestsThisMinute >= MAX_REQUESTS_PER_MINUTE) {
+    const timeToWait = RATE_LIMIT_WINDOW - (now - windowStart);
+    console.log(`Rate limit reached. Waiting ${timeToWait}ms before next request.`);
+    await new Promise(resolve => setTimeout(resolve, timeToWait));
+    return rateLimitedApiCall(apiCallFn);
+  }
+
+  requestsThisMinute++;
+  return apiCallFn();
+}
+
 async function selectRelevantFiles(query, databaseContents) {
   console.log('Starting selectRelevantFiles function');
   try {
@@ -23,7 +46,7 @@ async function selectRelevantFiles(query, databaseContents) {
       files: Object.values(databaseContents.files).map(content => ({
         fileName: content.file_name,
         summary: content.file_summary,
-        functions: content.functions.map(f => f.function_name),
+        functions: (content.functions || []).map(f => f.function_name),
         imports: content.imports
       }))
     };
@@ -77,7 +100,10 @@ Please analyze the codebase and select the most relevant files and functions tha
       console.log('Assistant response received');
       const response = JSON.parse(lastAssistantMessage.content[0].text.value);
       console.log('Parsed response:', response);
-      return response;
+      return {
+        ...response,
+        usage: runStatus.usage
+      };
     } else {
       throw new Error('No response from assistant');
     }
@@ -89,32 +115,19 @@ Please analyze the codebase and select the most relevant files and functions tha
 
 async function analyzeFile(fileContent, fileName) {
   console.log(`Starting analyzeFile function for ${fileName}`);
-  const maxRetries = 3;
-  const timeout = 60000; // 60 seconds timeout
+  const maxRetries = 5;
+  const baseTimeout = 30000; // 30 seconds
 
-  return new Promise(async (resolve, reject) => {
-    const globalTimeout = setTimeout(() => {
-      reject(new Error(`Global timeout reached for ${fileName}`));
-    }, timeout * 2); // Double the timeout for the entire function
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      console.log(`Attempt ${attempt} for ${fileName}`);
 
-    for (let attempt = 1; attempt <= maxRetries; attempt++) {
-      try {
-        console.log(`Attempt ${attempt} for ${fileName}`);
+      const thread = await rateLimitedApiCall(() => openai.beta.threads.create());
+      console.log('Thread created:', thread.id);
 
-        // Create a thread
-        console.log(`Creating thread (Attempt ${attempt})`);
-        const thread = await Promise.race([
-          openai.beta.threads.create(),
-          new Promise((_, reject) => setTimeout(() => reject(new Error('Thread creation timeout')), timeout))
-        ]);
-        console.log('Thread created:', thread.id);
-
-        // Add a message to the thread
-        console.log('Adding message to thread');
-        await Promise.race([
-          openai.beta.threads.messages.create(thread.id, {
-            role: "user",
-            content: `Please analyze the following file content for ${fileName}. Provide a summary of the file, list all functions with their summaries and the functions they call, and list all imports. Return the response as a JSON object with the following structure:
+      await rateLimitedApiCall(() => openai.beta.threads.messages.create(thread.id, {
+        role: "user",
+        content: `Please analyze the following file content for ${fileName}. Provide a summary of the file, list all functions with their summaries and the functions they call, and list all imports. Return the response as a JSON object with the following structure:
 
 {
   "file_name": "${fileName}",
@@ -132,69 +145,53 @@ async function analyzeFile(fileContent, fileName) {
 Here's the file content:
 
 ${fileContent}`
-          }),
-          new Promise((_, reject) => setTimeout(() => reject(new Error('Message creation timeout')), timeout))
-        ]);
+      }));
 
-        // Run the assistant
-        console.log(`Running assistant (Attempt ${attempt})`);
-        const run = await Promise.race([
-          openai.beta.threads.runs.create(thread.id, { assistant_id: ASSISTANT_ID }),
-          new Promise((_, reject) => setTimeout(() => reject(new Error('Run creation timeout')), timeout))
-        ]);
+      const run = await rateLimitedApiCall(() => openai.beta.threads.runs.create(thread.id, { assistant_id: ASSISTANT_ID }));
 
-        // Wait for the run to complete
-        console.log('Waiting for run to complete');
-        let runStatus;
-        const startTime = Date.now();
-        while (true) {
-          runStatus = await Promise.race([
-            openai.beta.threads.runs.retrieve(thread.id, run.id),
-            new Promise((_, reject) => setTimeout(() => reject(new Error('Run status check timeout')), 10000))
-          ]);
-          console.log('Run status:', runStatus.status);
-          if (runStatus.status === 'completed') break;
-          if (Date.now() - startTime > timeout) {
-            throw new Error('Run timed out');
-          }
-          await new Promise(resolve => setTimeout(resolve, 1000));
-        }
+      const timeout = baseTimeout * Math.pow(2, attempt - 1);
+      const runResult = await waitForRunCompletion(thread.id, run.id, timeout);
 
-        // Retrieve the messages
-        console.log('Retrieving messages');
-        const messages = await Promise.race([
-          openai.beta.threads.messages.list(thread.id),
-          new Promise((_, reject) => setTimeout(() => reject(new Error('Message retrieval timeout')), timeout))
-        ]);
+      const messages = await rateLimitedApiCall(() => openai.beta.threads.messages.list(thread.id));
 
-        // Get the last assistant message
-        const lastAssistantMessage = messages.data
-          .filter(message => message.role === 'assistant')
-          .pop();
+      const lastAssistantMessage = messages.data
+        .filter(message => message.role === 'assistant')
+        .pop();
 
-        if (lastAssistantMessage) {
-          console.log('Assistant response received');
-          const analysisResult = JSON.parse(lastAssistantMessage.content[0].text.value);
-          analysisResult.content = fileContent;
-          console.log('Analysis result:', analysisResult);
-          clearTimeout(globalTimeout);
-          resolve(analysisResult);
-          return;
-        } else {
-          throw new Error('No response from assistant');
-        }
-      } catch (error) {
-        console.error(`Error in analyzeFile for ${fileName} (Attempt ${attempt}):`, error);
-        if (attempt === maxRetries) {
-          clearTimeout(globalTimeout);
-          reject(error);
-          return;
-        }
-        console.log(`Retrying in 5 seconds...`);
-        await new Promise(resolve => setTimeout(resolve, 5000));
+      if (lastAssistantMessage) {
+        console.log('Assistant response received');
+        const analysisResult = JSON.parse(lastAssistantMessage.content[0].text.value);
+        analysisResult.content = fileContent;
+        analysisResult.usage = runResult.usage;
+        console.log('Analysis result:', analysisResult);
+        return analysisResult;
+      } else {
+        throw new Error('No response from assistant');
       }
+    } catch (error) {
+      console.error(`Error in analyzeFile for ${fileName} (Attempt ${attempt}):`, error);
+      if (attempt === maxRetries) {
+        throw error;
+      }
+      const delay = Math.pow(2, attempt) * 1000; // Exponential backoff
+      console.log(`Retrying in ${delay / 1000} seconds...`);
+      await new Promise(resolve => setTimeout(resolve, delay));
     }
-  });
+  }
+}
+async function waitForRunCompletion(threadId, runId, timeout) {
+  const startTime = Date.now();
+  while (true) {
+    const runStatus = await rateLimitedApiCall(() => openai.beta.threads.runs.retrieve(threadId, runId));
+    console.log('Run status:', runStatus.status);
+    if (runStatus.status === 'completed') {
+      return runStatus;
+    }
+    if (Date.now() - startTime > timeout) {
+      throw new Error('Run timed out');
+    }
+    await new Promise(resolve => setTimeout(resolve, 1000));
+  }
 }
 
 module.exports = {
