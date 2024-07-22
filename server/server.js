@@ -35,6 +35,38 @@ setupEnvFile().then(() => {
     apiKey: process.env.VUE_APP_ANTHROPIC_API_KEY,
   });
 
+  async function readAiIgnoreFile(projectRoot) {
+    const aiIgnorePath = path.join(projectRoot, '.ai_ignore');
+    console.log(`Attempting to read .ai_ignore file from: ${aiIgnorePath}`);
+    try {
+      const content = await fs.readFile(aiIgnorePath, 'utf8');
+      console.log('Raw content of .ai_ignore:', content);
+      const ignoredPaths = content.split('\n')
+        .map(line => line.trim())
+        .filter(line => line && !line.startsWith('#'));
+      console.log('Parsed ignored paths:', ignoredPaths);
+      return ignoredPaths;
+    } catch (error) {
+      if (error.code === 'ENOENT') {
+        console.log('No .ai_ignore file found');
+        return [];
+      }
+      console.error('Error reading .ai_ignore file:', error);
+      throw error;
+    }
+  }
+  function isIgnored(filePath, ignoredPaths) {
+    return ignoredPaths.some(ignoredPath => {
+      if (ignoredPath.endsWith('/')) {
+        // It's a directory, check if the file is inside this directory
+        return filePath.startsWith(ignoredPath) || filePath === ignoredPath.slice(0, -1);
+      } else {
+        // It's a file, check for exact match
+        return filePath === ignoredPath;
+      }
+    });
+  }
+
   app.post('/api/openai', async (req, res) => {
     try {
       const response = await axios.post('https://api.openai.com/v1/chat/completions', req.body, {
@@ -217,46 +249,89 @@ setupEnvFile().then(() => {
     
         const rootDirectory = req.body.rootDirectory;
         const projectRoot = path.join(process.cwd(), 'projects', rootDirectory);
+        console.log(`Project root: ${projectRoot}`);
     
-        // Ensure the project root directory exists
+        console.log('Ensuring project root directory exists...');
         await fs.mkdir(projectRoot, { recursive: true });
     
-        // Get the file paths from the request body
+        // Check if .ai_ignore is being uploaded
+        const aiIgnoreFile = req.files.find(file => file.originalname === '.ai_ignore');
+        if (aiIgnoreFile) {
+          console.log('.ai_ignore file found in upload, moving it first');
+          const aiIgnorePath = path.join(projectRoot, '.ai_ignore');
+          await fs.rename(aiIgnoreFile.path, aiIgnorePath);
+        }
+    
+        console.log('Reading .ai_ignore file...');
+        const ignoredPaths = await readAiIgnoreFile(projectRoot);
+        console.log('Ignored paths:', ignoredPaths);
+    
         let filePaths = req.body.filePaths;
         if (!Array.isArray(filePaths)) {
           filePaths = [filePaths];
         }
+        console.log('All file paths:', filePaths);
     
-        // First, create all necessary directories
-        for (const filePath of filePaths) {
-          const absolutePath = path.join(projectRoot, filePath);
-          await fs.mkdir(path.dirname(absolutePath), { recursive: true });
-        }
+        console.log('Filtering out ignored files...');
+        const filteredFilePaths = filePaths.filter(filePath => {
+          const isIgnored = ignoredPaths.some(ignoredPath => {
+            const ignored = ignoredPath.endsWith('/') 
+              ? filePath.startsWith(ignoredPath) || filePath === ignoredPath.slice(0, -1)
+              : filePath === ignoredPath;
+            if (ignored) {
+              console.log(`File ${filePath} matches ignore rule ${ignoredPath}`);
+            }
+            return ignored;
+          });
+          if (isIgnored) {
+            console.log(`Ignoring file: ${filePath}`);
+          } else {
+            console.log(`Keeping file: ${filePath}`);
+          }
+          return !isIgnored;
+        });
     
-        // Now, move all files
-        const files = await Promise.all(req.files.map(async (file, index) => {
-          const relativePath = filePaths[index];
-          const absolutePath = path.join(projectRoot, relativePath);
+        console.log('Filtered file paths:', filteredFilePaths);
+    
+        console.log('Processing non-ignored files...');
+        const processedFiles = await Promise.all(filteredFilePaths.map(async (filePath) => {
+          if (filePath === '.ai_ignore') {
+            console.log('Skipping .ai_ignore file as it has already been processed');
+            return null;
+          }
           
-          // Move the file to its correct location
-          await fs.rename(file.path, absolutePath);
-    
-          console.log(`File moved to: ${absolutePath}`);
-    
-          return { relativePath, absolutePath };
+          const absolutePath = path.join(projectRoot, filePath);
+          console.log(`Processing file: ${filePath}`);
+          
+          const uploadedFile = req.files.find(file => file.originalname === path.basename(filePath));
+          
+          if (uploadedFile) {
+            console.log(`Creating directory for: ${absolutePath}`);
+            await fs.mkdir(path.dirname(absolutePath), { recursive: true });
+            console.log(`Moving file from ${uploadedFile.path} to ${absolutePath}`);
+            await fs.rename(uploadedFile.path, absolutePath);
+            console.log(`File moved to: ${absolutePath}`);
+            return { relativePath: filePath, absolutePath };
+          } else {
+            console.log(`No uploaded file found for: ${filePath}`);
+            return null;
+          }
         }));
     
-        console.log('Files processed:', files);
+        const validFiles = processedFiles.filter(file => file !== null);
+        console.log('Files to be processed by codebaseManager:', validFiles.map(f => f.relativePath));
     
-        const result = await codebaseManager.startProcess(files, projectRoot);
-        console.log('Process result:', result);
+        console.log('Starting codebaseManager.startProcess...');
+        const result = await codebaseManager.startProcess(validFiles, projectRoot, ignoredPaths);
+        console.log('codebaseManager.startProcess result:', result);
         
         res.status(200).json({ 
           message: result ? 'Process completed successfully' : 'Process failed',
           success: result
         });
+    
       } catch (error) {
-        console.error('Process Error:', error);
+        console.error('Error in start-process:', error);
         res.status(500).json({ error: error.message });
       }
     });
@@ -348,8 +423,7 @@ setupEnvFile().then(() => {
       Summary: ${file.summary}
       
       Relevant Functions:
-      ${file.functions.map(f => `- ${f.function_name}: ${f.summary}`).join('\n')}
-      `).join('\n')}
+      ${file.functions.map(f => `- ${f.function_name}: ${f.summary}`).join('\n')}`).join('\n')}
       
       And the following file structure:
       ${JSON.stringify(databaseContents.fileStructure, null, 2)}
@@ -383,155 +457,156 @@ setupEnvFile().then(() => {
         ]
       }`;
       
-      console.log('Full prompt being sent to the analyzing LLM:');
-      console.log(prompt);
-    
-      console.log('Making API call');
-      const response = await makeApiCall('Project', 'Claude', prompt);
-      console.log('Received response from API:', JSON.stringify(response, null, 2));
-    
-      if (!response) {
-        console.error('No response received from API');
-        return res.status(500).json({ error: 'No response received from API service' });
-      }
-    
-      if (typeof response !== 'object' || !response.conversation) {
-        console.error('Unexpected API response structure:', response);
-        return res.status(500).json({ error: 'Unexpected response structure from API service' });
-      }
-    
-      let result;
-      try {
-        result = JSON.parse(response.conversation);
-        console.log('Parsed result:', JSON.stringify(result, null, 2));
-      } catch (parseError) {
-        console.error('Error parsing API response:', parseError);
-        return res.status(500).json({ error: 'Invalid response from API service' });
-      }
-    
-      if (!result || !result.explanation || !Array.isArray(result.modifications)) {
-        console.error('Unexpected response structure after parsing:', result);
-        return res.status(500).json({ error: 'Unexpected response structure from API service' });
-      }
-    
-      console.log('Processing modifications');
-      const safeModifications = result.modifications.map(mod => {
-        if (!mod) {
-          console.error('Encountered null or undefined modification');
-          return null;
-        }
-        return {
-          fileName: mod.fileName || 'Unknown File',
-          changes: mod.changes || 'No changes described',
-          scripts: Array.isArray(mod.scripts) ? mod.scripts.map(script => {
-            if (!script) {
-              console.error('Encountered null or undefined script');
+          console.log('Full prompt being sent to the analyzing LLM:');
+          console.log(prompt);
+        
+          console.log('Making API call');
+          const response = await makeApiCall('Project', 'Claude', prompt);
+          console.log('Received response from API:', JSON.stringify(response, null, 2));
+        
+          if (!response) {
+            console.error('No response received from API');
+            return res.status(500).json({ error: 'No response received from API service' });
+          }
+        
+          if (typeof response !== 'object' || !response.conversation) {
+            console.error('Unexpected API response structure:', response);
+            return res.status(500).json({ error: 'Unexpected response structure from API service' });
+          }
+        
+          let result;
+          try {
+            result = JSON.parse(response.conversation);
+            console.log('Parsed result:', JSON.stringify(result, null, 2));
+          } catch (parseError) {
+            console.error('Error parsing API response:', parseError);
+            return res.status(500).json({ error: 'Invalid response from API service' });
+          }
+        
+          if (!result || !result.explanation || !Array.isArray(result.modifications)) {
+            console.error('Unexpected response structure after parsing:', result);
+            return res.status(500).json({ error: 'Unexpected response structure from API service' });
+          }
+        
+          console.log('Processing modifications');
+          const safeModifications = result.modifications.map(mod => {
+            if (!mod) {
+              console.error('Encountered null or undefined modification');
               return null;
             }
-            // Split the content by SCRIPT_X markers
-            const scriptParts = script.content.split(/SCRIPT_\d+\n/);
-            // Remove any empty strings from the array
-            const cleanScripts = scriptParts.filter(part => part.trim() !== '');
             return {
-              name: script.name || 'Unnamed Script',
-              content: cleanScripts
+              fileName: mod.fileName || 'Unknown File',
+              changes: mod.changes || 'No changes described',
+              scripts: Array.isArray(mod.scripts) ? mod.scripts.map(script => {
+                if (!script) {
+                  console.error('Encountered null or undefined script');
+                  return null;
+                }
+                // Split the content by SCRIPT_X markers
+                const scriptParts = script.content.split(/SCRIPT_\d+\n/);
+                // Remove any empty strings from the array
+                const cleanScripts = scriptParts.filter(part => part.trim() !== '');
+                return {
+                  name: script.name || 'Unnamed Script',
+                  content: cleanScripts
+                };
+              }).filter(Boolean) : []
             };
-          }).filter(Boolean) : []
-        };
-      }).filter(Boolean);
-  
-      console.log('Final response:', JSON.stringify({
-        explanation: result.explanation,
-        modifications: safeModifications
-      }, null, 2));
-  
-      console.log('Sending response');
-      res.json({
-        explanation: result.explanation,
-        modifications: safeModifications
+          }).filter(Boolean);
+      
+          console.log('Final response:', JSON.stringify({
+            explanation: result.explanation,
+            modifications: safeModifications
+          }, null, 2));
+      
+          console.log('Sending response');
+          res.json({
+            explanation: result.explanation,
+            modifications: safeModifications
+          });
+        } catch (error) {
+          console.error('Error in code analysis and modification:', error);
+          res.status(500).json({ error: 'Error in code analysis and modification process' });
+        }
       });
-    } catch (error) {
-      console.error('Error in code analysis and modification:', error);
-      res.status(500).json({ error: 'Error in code analysis and modification process' });
-    }
-  });
+    
+      app.post('/api/save-api-keys', async (req, res) => {
+        try {
+          const { claudeApiKey, openaiApiKey, openaiAssistantId } = req.body;
+      
+          if (!claudeApiKey && !openaiApiKey && !openaiAssistantId) {
+            return res.status(400).json({ error: 'At least one API key or Assistant ID must be provided' });
+          }
+      
+          const envPath = path.resolve(__dirname, '.env');
+        let envContent = await fs.readFile(envPath, 'utf8');
+    
+        if (claudeApiKey) {
+          const claudeKeyRegex = /VUE_APP_ANTHROPIC_API_KEY=.*/;
+          if (claudeKeyRegex.test(envContent)) {
+            envContent = envContent.replace(claudeKeyRegex, `VUE_APP_ANTHROPIC_API_KEY=${claudeApiKey}`);
+          } else {
+            envContent += `\nVUE_APP_ANTHROPIC_API_KEY=${claudeApiKey}`;
+          }
+        }
+    
+        if (openaiApiKey) {
+          const openaiKeyRegex = /VUE_APP_OPENAI_API_KEY=.*/;
+          if (openaiKeyRegex.test(envContent)) {
+            envContent = envContent.replace(openaiKeyRegex, `VUE_APP_OPENAI_API_KEY=${openaiApiKey}`);
+          } else {
+            envContent += `\nVUE_APP_OPENAI_API_KEY=${openaiApiKey}`;
+          }
+        }
 
-  app.post('/api/save-api-keys', async (req, res) => {
-    try {
-      const { claudeApiKey, openaiApiKey, openaiAssistantId } = req.body;
-  
-      if (!claudeApiKey && !openaiApiKey && !openaiAssistantId) {
-        return res.status(400).json({ error: 'At least one API key or Assistant ID must be provided' });
-      }
-  
-      const envPath = path.resolve(__dirname, '.env');
-      let envContent = await fs.readFile(envPath, 'utf8');
-  
-      if (claudeApiKey) {
-        const claudeKeyRegex = /VUE_APP_ANTHROPIC_API_KEY=.*/;
-        if (claudeKeyRegex.test(envContent)) {
-          envContent = envContent.replace(claudeKeyRegex, `VUE_APP_ANTHROPIC_API_KEY=${claudeApiKey}`);
-        } else {
-          envContent += `\nVUE_APP_ANTHROPIC_API_KEY=${claudeApiKey}`;
+        if (openaiAssistantId) {
+          const assistantIdRegex = /VUE_APP_OPENAI_ASSISTANT_ID=.*/;
+          if (assistantIdRegex.test(envContent)) {
+            envContent = envContent.replace(assistantIdRegex, `VUE_APP_OPENAI_ASSISTANT_ID=${openaiAssistantId}`);
+          } else {
+            envContent += `\nVUE_APP_OPENAI_ASSISTANT_ID=${openaiAssistantId}`;
+          }
         }
+    
+        await fs.writeFile(envPath, envContent);
+    
+        // Refresh environment variables
+        require('dotenv').config();
+    
+        res.json({ message: 'API keys and Assistant ID saved successfully' });
+      } catch (error) {
+        console.error('Error saving API keys:', error);
+        res.status(500).json({ error: 'Failed to save API keys' });
       }
-  
-      if (openaiApiKey) {
-        const openaiKeyRegex = /VUE_APP_OPENAI_API_KEY=.*/;
-        if (openaiKeyRegex.test(envContent)) {
-          envContent = envContent.replace(openaiKeyRegex, `VUE_APP_OPENAI_API_KEY=${openaiApiKey}`);
-        } else {
-          envContent += `\nVUE_APP_OPENAI_API_KEY=${openaiApiKey}`;
-        }
-      }
-  
-      if (openaiAssistantId) {
-        const assistantIdRegex = /VUE_APP_OPENAI_ASSISTANT_ID=.*/;
-        if (assistantIdRegex.test(envContent)) {
-          envContent = envContent.replace(assistantIdRegex, `VUE_APP_OPENAI_ASSISTANT_ID=${openaiAssistantId}`);
-        } else {
-          envContent += `\nVUE_APP_OPENAI_ASSISTANT_ID=${openaiAssistantId}`;
-        }
-      }
-  
-      await fs.writeFile(envPath, envContent);
-  
-      // Refresh environment variables
-      require('dotenv').config();
-  
-      res.json({ message: 'API keys and Assistant ID saved successfully' });
-    } catch (error) {
-      console.error('Error saving API keys:', error);
-      res.status(500).json({ error: 'Failed to save API keys' });
-    }
-  });
+    });
 
-function startServer(port) {
-app.listen(port, () => {
-  console.log(`Server running on port ${port}`);
-  console.log('Environment variables:');
-  console.log('OPENAI_API_KEY:', process.env.VUE_APP_OPENAI_API_KEY ? 'Set' : 'Not set');
-  console.log('ANTHROPIC_API_KEY:', process.env.VUE_APP_ANTHROPIC_API_KEY ? 'Set' : 'Not set');
-}).on('error', (err) => {
-  if (err.code === 'EADDRINUSE') {
-    console.log(`Port ${port} is busy, trying with port ${port + 1}`);
-    startServer(port + 1);
-  } else {
-    console.error('Server error:', err);
+  function startServer(port) {
+    app.listen(port, () => {
+      console.log(`Server running on port ${port}`);
+      console.log('Environment variables:');
+      console.log('OPENAI_API_KEY:', process.env.VUE_APP_OPENAI_API_KEY ? 'Set' : 'Not set');
+      console.log('ANTHROPIC_API_KEY:', process.env.VUE_APP_ANTHROPIC_API_KEY ? 'Set' : 'Not set');
+      console.log('OPENAI_ASSISTANT_ID:', process.env.VUE_APP_OPENAI_ASSISTANT_ID ? 'Set' : 'Not set');
+    }).on('error', (err) => {
+      if (err.code === 'EADDRINUSE') {
+        console.log(`Port ${port} is busy, trying with port ${port + 1}`);
+        startServer(port + 1);
+      } else {
+        console.error('Server error:', err);
+      }
+    });
   }
-});
-}
 
-app.get('/api/get-api-keys', (req, res) => {
-  res.json({
-    claudeApiKey: process.env.VUE_APP_ANTHROPIC_API_KEY || 'No Key',
-    openaiApiKey: process.env.VUE_APP_OPENAI_API_KEY || '',
-    openaiAssistantId: process.env.VUE_APP_OPENAI_ASSISTANT_ID || ''
-  });
-});
+  app.get('/api/get-api-keys', (req, res) => {
+      res.json({
+        claudeApiKey: process.env.VUE_APP_ANTHROPIC_API_KEY || 'No Key',
+        openaiApiKey: process.env.VUE_APP_OPENAI_API_KEY || '',
+        openaiAssistantId: process.env.VUE_APP_OPENAI_ASSISTANT_ID || ''
+      });
+    });
 
-startServer(BASE_PORT);
+  startServer(BASE_PORT);
 }).catch(error => {
-console.error('Failed to setup environment:', error);
-process.exit(1);
+  console.error('Failed to setup environment:', error);
+  process.exit(1);
 });

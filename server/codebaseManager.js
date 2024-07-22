@@ -51,39 +51,59 @@ async function closeDatabase() {
 }
 
 async function calculateFileHash(filePath) {
-    const fileBuffer = await fs.readFile(filePath);
-    const hashSum = crypto.createHash('sha256');
-    hashSum.update(fileBuffer);
-    return hashSum.digest('hex');
+    try {
+        const fileBuffer = await fs.readFile(filePath);
+        const hashSum = crypto.createHash('sha256');
+        hashSum.update(fileBuffer);
+        return hashSum.digest('hex');
+    } catch (error) {
+        console.error(`Error calculating hash for ${filePath}:`, error);
+        throw error;
+    }
 }
 
-async function startProcess(files, projectRoot) {
+async function startProcess(files, projectRoot, ignoredPaths) {
     console.log(`Starting process for ${files.length} files`);
+    console.log('Project root:', projectRoot);
+    console.log('Ignored paths:', ignoredPaths);
     try {
         await openDatabase();
         console.log('Database initialized');
 
         for (const file of files) {
-            console.log(`Processing file: ${file.relativePath}`);
-            const fileContent = await readFile(file.absolutePath);
+            try {
+                console.log(`Processing file: ${file.relativePath}`);
+                const fileContent = await readFile(file.absolutePath);
 
-            if (fileContent !== null) {
-                const currentHash = await calculateFileHash(file.absolutePath);
-                const storedHash = await getStoredHash(file.relativePath);
+                if (fileContent !== null) {
+                    const currentHash = await calculateFileHash(file.absolutePath);
+                    const storedHash = await getStoredHash(file.relativePath);
 
-                if (currentHash !== storedHash) {
-                    console.log(`File ${file.relativePath} has changed, processing...`);
-                    const analysisResult = await analyzeFile(file.relativePath, fileContent);
-                    await storeAnalysisResult(analysisResult, projectRoot, currentHash);
-                    console.log(`Completed processing and storing file: ${file.relativePath}`);
+                    console.log(`File: ${file.relativePath}`);
+                    console.log(`Current hash: ${currentHash}`);
+                    console.log(`Stored hash: ${storedHash}`);
+
+                    if (currentHash !== storedHash) {
+                        console.log(`File ${file.relativePath} has changed, processing...`);
+                        try {
+                            const analysisResult = await analyzeFile(file.relativePath, fileContent);
+                            await storeAnalysisResult(analysisResult, projectRoot, currentHash);
+                            console.log(`Completed processing and storing file: ${file.relativePath}`);
+                        } catch (analysisError) {
+                            console.error(`Error analyzing file ${file.relativePath}:`, analysisError);
+                        }
+                    } else {
+                        console.log(`File ${file.relativePath} unchanged, skipping...`);
+                    }
                 } else {
-                    console.log(`File ${file.relativePath} unchanged, skipping...`);
+                    console.log(`Skipped file: ${file.relativePath} due to read error`);
                 }
-            } else {
-                console.log(`Skipped file: ${file.relativePath} due to read error`);
+            } catch (fileError) {
+                console.error(`Error processing file ${file.relativePath}:`, fileError);
             }
         }
 
+        console.log('Generating function call tree...');
         const tree = await generateFunctionCallTree(projectRoot);
         await db.put('functionCallTree', tree);
 
@@ -91,9 +111,6 @@ async function startProcess(files, projectRoot) {
         return true;
     } catch (error) {
         console.error('Error in startProcess:', error);
-        if (error.code === 'LEVEL_DATABASE_NOT_OPEN') {
-            console.error('Database failed to open. Please check the database directory permissions.');
-        }
         return false;
     } finally {
         await closeDatabase();
@@ -108,12 +125,21 @@ async function getStoredHash(relativePath) {
         if (error.notFound) {
             return null;
         }
+        console.error(`Error getting stored hash for ${relativePath}:`, error);
         throw error;
     }
 }
 
 async function analyzeFile(filePath, content) {
-    return await customGPT.analyzeFile(content, filePath);
+    console.log(`Analyzing file: ${filePath}`);
+    try {
+        const result = await customGPT.analyzeFile(content, filePath);
+        console.log(`Analysis completed for file: ${filePath}`);
+        return result;
+    } catch (error) {
+        console.error(`Error in analyzeFile for ${filePath}:`, error);
+        throw error;
+    }
 }
 
 function extractFunctions(content) {
@@ -188,6 +214,7 @@ async function storeAnalysisResult(analysisResult, projectRoot, fileHash) {
         console.log(`Successfully stored analysis result for file: ${analysisResult.file_name}`);
     } catch (error) {
         console.error(`Error storing analysis result for ${analysisResult.file_name}:`, error);
+        throw error;
     }
 }
 

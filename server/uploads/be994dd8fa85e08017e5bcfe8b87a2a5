@@ -1,0 +1,6 @@
+def say_nope():
+    print("nope!")
+    
+
+if __name__ == "__main__":
+    say_nope

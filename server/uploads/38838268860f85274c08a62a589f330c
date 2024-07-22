@@ -1,0 +1,5 @@
+# Ignore the file nope.py
+nope.py
+
+# Ignore the entire boop folder and its contents
+boop/
