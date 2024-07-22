@@ -8,6 +8,8 @@ server/projects
 server/uploads
 server/codebase-db
 server/.env
+server/prompts
+
 
 # local env files
 .env.local
