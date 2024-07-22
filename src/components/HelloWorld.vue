@@ -25,7 +25,6 @@
               <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
             </svg>
           </button>
-          
         </div>
       </div>
       <UserInput @sendMessage="handleSend" />
@@ -75,12 +74,12 @@
         </div>
       </div>
       <CodeDisplay 
-    :codeScripts="codeScripts" 
-    :activeTab="activeTab"
-    :fileNames="scriptFileNames"
-    @setActiveTab="setActiveTab"
-    @copyCode="copyCode"
-  />
+        :codeScripts="codeScripts" 
+        :activeTab="activeTab"
+        :fileNames="scriptFileNames"
+        @setActiveTab="setActiveTab"
+        @copyCode="copyCode"
+      />
       <transition name="modal">
         <div v-if="showDatabaseViewer" class="modal-overlay">
           <div class="modal-content">
@@ -110,6 +109,7 @@ const store = useStore();
 
 const showApiKeyModal = ref(false);
 const codeScripts = ref([]);
+const scriptFileNames = ref([]);
 const activeTab = ref(0);
 const models = ['Claude', 'GPT4o'];
 const selectedModel = ref('Claude');
@@ -369,10 +369,6 @@ const handleProjectMode = async (message) => {
       })
     );
     
-    // Make sure scriptFileNames is defined as a ref
-    if (!scriptFileNames) {
-      scriptFileNames = ref([]);
-    }
     scriptFileNames.value = result.modifications.map(mod => getFileName(mod.fileName));
 
     // Reset activeTab to show the first script
@@ -497,6 +493,10 @@ watch(selectedMode, (newMode) => {
   store.commit('SET_SELECTED_MODE', newMode);
 });
 </script>
+
+<style scoped>
+/* Your existing styles here */
+</style>
 
 <style scoped>
 .container {
