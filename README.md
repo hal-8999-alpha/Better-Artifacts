@@ -1,3 +1,5 @@
+## PROJECT IS DEPRECATED. USE CURSOR ##
+
 # Better Artifacts
 GPT4o mini + Claude 3.5 Sonnet for Large Projects
 (Vue 3 and Node.js)
